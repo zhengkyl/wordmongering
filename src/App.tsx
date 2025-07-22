@@ -1,10 +1,80 @@
-import { DndContext } from "@dnd-kit/core";
-import { SortableContext } from "@dnd-kit/sortable";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type ClientRect,
+  type CollisionDescriptor,
+  type CollisionDetection,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useState, type ReactNode } from "react";
 import { DeckDialog } from "./components/Dialog";
 import LeftDrawer from "./components/Drawer";
 import { getStartingDeck, type Deck, type TileMeta } from "./lib/constants";
 import { shuffleInPlace } from "./lib/utils";
+
+export function getDirectionalIntersection(
+  entry: ClientRect,
+  target: ClientRect
+) {
+  const top = Math.max(target.top, entry.top);
+  const bottom = Math.min(target.top + target.height, entry.top + entry.height);
+  const height = bottom - top;
+
+  const left = Math.max(target.left, entry.left);
+  const right = Math.min(target.left + target.width, entry.left + entry.width);
+  const width = right - left;
+
+  const targetCenter = target.left + target.width / 2;
+  const entryCenter = entry.left + entry.width / 2;
+  const direction = targetCenter < entryCenter ? -1 : 1;
+
+  if (left < right && top < bottom) {
+    const targetArea = target.width * target.height;
+    const entryArea = entry.width * entry.height;
+    const intersectionArea = width * height;
+    const intersectionRatio =
+      intersectionArea / (targetArea + entryArea - intersectionArea);
+
+    return [direction, Math.floor(intersectionRatio * 100) / 100];
+  }
+
+  return [direction, 0];
+}
+
+export const directionalRectIntersection: CollisionDetection = ({
+  collisionRect,
+  droppableRects,
+  droppableContainers,
+}) => {
+  const collisions: CollisionDescriptor[] = [];
+
+  for (const droppableContainer of droppableContainers) {
+    const { id } = droppableContainer;
+    const rect = droppableRects.get(id);
+    if (rect == null) continue;
+
+    const [direction, ratio] = getDirectionalIntersection(rect, collisionRect);
+
+    if (ratio === 0) continue;
+
+    collisions.push({
+      id,
+      data: { droppableContainer, value: ratio, direction },
+    });
+  }
+
+  return collisions.sort((a, b) => b.data.value - a.data.value);
+};
 
 type FieldSlotProps = {
   tileId: string | null;
@@ -20,7 +90,8 @@ function tileIdsFromDeck(deck: Record<string, TileMeta[]>): string[] {
   shuffleInPlace(tiles);
   return tiles;
 }
-
+// idea, no hand droppable, if over nothing go to hand
+// does this work with animations? how does draggable animate to original location?
 export function App() {
   const [fieldSlots, setFieldSlots] = useState<FieldSlotProps[]>(
     Array.from({ length: 10 }, () => ({ tileId: null }))
@@ -42,10 +113,59 @@ export function App() {
     return [letter, deck[letter]![index]] as const;
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const activeProps = activeId ? getTile(activeId) : null;
+
   return (
     <div>
       <div className="h-12 bg-red">hello there</div>
-      <DndContext>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={directionalRectIntersection}
+        onDragStart={(e) => {
+          setActiveId(e.active.id as string);
+        }}
+        onDragCancel={() => {
+          setActiveId(null);
+        }}
+        onDragOver={(e) => {
+          const collision = e.collisions![0];
+          if (collision == null) {
+            console.log("return to hand");
+            return;
+          }
+          console.log(e);
+          // console.log(collision.data);
+        }}
+        onDragEnd={(e) => {
+          if (e.over) {
+            const overSlotId = e.over.id as string;
+            const [part, iStr] = overSlotId.split("_");
+            const i = parseInt(iStr);
+            if (part === "field") {
+              setFieldSlots((prev) => {
+                const next = [...prev];
+                next[i] = { tileId: activeId };
+                return next;
+              });
+              setHandSlots((prev) =>
+                prev.map((slot) =>
+                  slot.tileId === activeId ? { tileId: null } : slot
+                )
+              );
+            }
+          }
+          //
+        }}
+      >
         <div className="grid grid-cols-[1fr_auto_1fr]">
           <LeftDrawer></LeftDrawer>
           <div className="m-auto">
@@ -56,11 +176,17 @@ export function App() {
                   .map((slot) => slot.tileId as string)}
               >
                 {fieldSlots.map((slot, i) => {
-                  if (slot.tileId == null) return <FieldSlot key={i} />;
+                  const slotId = `field_${i}`;
+                  if (slot.tileId == null)
+                    return <FieldSlot key={i} id={slotId} />;
                   const [letter, meta] = getTile(slot.tileId);
                   return (
-                    <FieldSlot key={i}>
-                      <Tile letter={letter} meta={meta} />
+                    <FieldSlot key={i} id={slotId}>
+                      <SortableTile
+                        id={slot.tileId}
+                        letter={letter}
+                        meta={meta}
+                      />
                     </FieldSlot>
                   );
                 })}
@@ -73,7 +199,11 @@ export function App() {
                   const [letter, meta] = getTile(slot.tileId);
                   return (
                     <HandSlot key={i}>
-                      <Tile letter={letter} meta={meta} />
+                      <SortableTile
+                        id={slot.tileId}
+                        letter={letter}
+                        meta={meta}
+                      />
                     </HandSlot>
                   );
                 })}
@@ -123,14 +253,23 @@ export function App() {
             </div>
           </div>
         </div>
+        <DragOverlay>
+          {activeProps ? (
+            <Tile letter={activeProps[0]} meta={activeProps[1]} />
+          ) : null}
+        </DragOverlay>
       </DndContext>
     </div>
   );
 }
 
-function FieldSlot({ children }: { children?: ReactNode }) {
+function FieldSlot({ id, children }: { id: string; children?: ReactNode }) {
+  const { setNodeRef } = useDroppable({ id });
   return (
-    <div className="rounded border size-12 sm:size-24 bg-stone-400/40">
+    <div
+      className="rounded border size-12 sm:size-24 bg-stone-400/40"
+      ref={setNodeRef}
+    >
       {children}
     </div>
   );
@@ -149,6 +288,26 @@ type TileProps = {
   letter: keyof Deck;
   meta: TileMeta;
 };
+function SortableTile({ id, letter, meta }: TileProps & { id: string }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    // transition,
+  };
+  return (
+    <div
+      className={TILE_CLASS + " bg-gray-100 select-none touch-none"}
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+    >
+      {letter}
+    </div>
+  );
+}
+
 function Tile({ letter, meta }: TileProps) {
   return (
     <div className={TILE_CLASS + " bg-gray-100 select-none"}>{letter}</div>
