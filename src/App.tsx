@@ -13,7 +13,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { DeckDialog } from "./components/Dialog";
 import LeftDrawer from "./components/Drawer";
 import { getStartingDeck, type Deck, type TileMeta } from "./lib/constants";
@@ -120,11 +120,15 @@ export function App() {
     // })
   );
 
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
-  const activeProps = activeId ? getTile(activeId) : null;
+  const activeDragProps = activeDragId ? getTile(activeDragId) : null;
 
-  const fieldToHand = (fieldIndex: number, handIndex: number) => {
+  const fieldToHand = (
+    activeId: string,
+    fieldIndex: number,
+    handIndex: number
+  ) => {
     setFieldSlots((prev) => {
       const row = Math.floor(fieldIndex / ROW_LEN);
       if (row > 0) {
@@ -150,8 +154,16 @@ export function App() {
       return next;
     });
   };
+  const clearField = () => {
+    setFieldSlots(Array.from({ length: ROW_LEN }, () => ({ tileId: null })));
+    setHandSlots(
+      Array.from({ length: handSlots.length }, (_, i) => ({
+        tileId: activePile[i],
+      }))
+    );
+  };
 
-  const handToNextField = (handIndex: number) => {
+  const handToNextField = (activeId: string, handIndex: number) => {
     setHandSlots((prev) => {
       const next = [...prev];
       next[handIndex] = { tileId: null };
@@ -184,21 +196,20 @@ export function App() {
 
   // Only field slots have dropzones
   // so we manually determine hand slot "collision"
-  const getDragEndTo = (e: DragEndEvent) => {
-    if (!e.over) {
-      return ["hand", null] as const;
+  const getDropTarget = (e: DragEndEvent) => {
+    if (e.over) {
+      let sum = 0;
+      e.collisions!.forEach((collision) => (sum += collision.data!.value));
+      if (sum > 0.4) {
+        const toIndex = parseInt((e.over.id as string).split("_")[1]);
+        return ["field", toIndex] as const;
+      }
     }
-    let sum = 0;
-    e.collisions!.forEach((collision) => (sum += collision.data!.value));
-    if (sum < 0.5) {
-      return ["hand", null] as const;
-    }
-    const toIndex = parseInt((e.over.id as string).split("_")[1]);
-
-    return ["field", toIndex] as const;
+    const handIndex = activePile.findIndex(
+      (tileId) => tileId === activeDragId
+    )!;
+    return ["hand", handIndex] as const;
   };
-
-  const [cursor, setCursor] = useState(0);
 
   // TODO test against actual letters
   const allowedLetters = /^[A-Za-z ]$/;
@@ -217,69 +228,28 @@ export function App() {
           return;
         }
 
-        //TODO doesn't work, off by one delay
-        setActiveId(handSlots[handIndex].tileId);
-        handToNextField(handIndex);
+        handToNextField(handSlots[handIndex].tileId!, handIndex);
       }
 
       switch (e.key) {
         case "Backspace": {
           if (e.ctrlKey) {
             // return all keys to hand
+            clearField();
           } else {
-            console.log("h");
-            for (let i = fieldSlots.length; i >= 0; i--) {
+            // return last letter in field to hand
+            for (let i = fieldSlots.length - 1; i >= 0; i--) {
               if (fieldSlots[i].tileId != null) {
-                setActiveId(fieldSlots[i].tileId);
+                const activeId = fieldSlots[i].tileId!;
                 const activeHandIndex = activePile.findIndex(
                   (tileId) => tileId === activeId
                 )!;
-                // TODO doesn't work b/c updates not
-                fieldToHand(i, activeHandIndex);
+                fieldToHand(activeId, i, activeHandIndex);
+                break;
               }
             }
-            // return last letter in field to hand
           }
 
-          break;
-        }
-        case "ArrowLeft": {
-          if (e.ctrlKey) {
-            let i = cursor;
-            for (; i > 0; i--) {
-              if (fieldSlots[i].tileId == null) {
-                break;
-              }
-            }
-            setCursor(i);
-          } else {
-            setCursor((c) => Math.max(0, c - 1));
-          }
-          break;
-        }
-        case "ArrowRight": {
-          if (e.ctrlKey) {
-            let i = cursor;
-            for (; i < fieldSlots.length - 1; i++) {
-              if (fieldSlots[i].tileId == null) {
-                break;
-              }
-            }
-            setCursor(i);
-          }
-          setCursor((c) => Math.min(c + 1, fieldSlots.length - 1));
-          break;
-        }
-        case " ": {
-          setCursor((c) => Math.min(c + 1, fieldSlots.length - 1));
-          break;
-        }
-        case "Home": {
-          setCursor(0);
-          break;
-        }
-        case "End": {
-          setCursor(fieldSlots.length - 1);
           break;
         }
         default: {
@@ -295,6 +265,18 @@ export function App() {
     };
   });
 
+  const [dropTarget, setDropTarget] = useState<
+    ["field" | "hand", number] | null
+  >(null);
+  const dropTargetId = dropTarget ? `${dropTarget[0]}_${dropTarget[1]}` : null;
+
+  const isShortClick = (e: DragEndEvent) =>
+    Math.abs(e.delta.x) < 4 &&
+    Math.abs(e.delta.y) < 4 &&
+    performance.now() - dragStartTime < 200;
+
+  const isDragging = useRef(false);
+
   return (
     <div className="overflow-hidden">
       <div className="h-12 bg-red">hello there</div>
@@ -302,52 +284,64 @@ export function App() {
         sensors={sensors}
         collisionDetection={directionalRectIntersection}
         onDragStart={(e) => {
+          isDragging.current = true;
+          setActiveDragId(e.active.id as string);
           dragStartTime = performance.now();
-          setActiveId(e.active.id as string);
         }}
         onDragCancel={() => {
-          setActiveId(null);
+          isDragging.current = false;
+          setActiveDragId(null);
         }}
-        onDragOver={(e) => {
-          // const collision = e.collisions![0];
-          // if (collision == null) {
-          //   console.log("return to hand");
-          //   return;
-          // }
-          // console.log(collision.data);
+        onDragMove={(e) => {
+          // dragmove happens after dragend sometimes, but before
+          if (!isDragging.current) return;
+          if (isShortClick(e)) return;
+
+          const [to, toIndex] = getDropTarget(e);
+          if (to === "field") {
+            const toTileId = fieldSlots[toIndex].tileId;
+            if (toTileId != null && toTileId != activeDragId) {
+              return;
+            }
+            setDropTarget(["field", toIndex]);
+          } else {
+            setDropTarget(["hand", toIndex]);
+          }
         }}
         onDragEnd={(e) => {
+          isDragging.current = false;
+          setActiveDragId(null);
+
           const fieldIndex = fieldSlots.findIndex(
-            (slot) => slot.tileId === activeId
+            (slot) => slot.tileId === activeDragId
           );
           const activeHandIndex = activePile.findIndex(
-            (tileId) => tileId === activeId
+            (tileId) => tileId === activeDragId
           )!;
           const from = fieldIndex === -1 ? "hand" : "field";
 
           // Handle short clicks
-          if (
-            Math.abs(e.delta.x) < 4 &&
-            Math.abs(e.delta.y) < 4 &&
-            performance.now() - dragStartTime < 200
-          ) {
+          if (isShortClick(e)) {
+            console.log("is short click");
             if (from === "field") {
               // field to hand
-              fieldToHand(fieldIndex, activeHandIndex);
+              fieldToHand(activeDragId!, fieldIndex, activeHandIndex);
             } else {
               // hand to field
-              handToNextField(activeHandIndex);
+              handToNextField(activeDragId!, activeHandIndex);
             }
             return;
           }
 
-          const [to, toIndex] = getDragEndTo(e);
-          if (toIndex === fieldIndex) {
-            return;
-          }
+          if (dropTarget == null) return;
+          const [to, toIndex] = dropTarget;
+
+          setDropTarget(null);
 
           if (from === "field") {
             if (to === "field") {
+              if (fieldIndex === toIndex) return;
+
               // field to field
 
               // TODO: maybe more advanced logic, but moving tiles seems problematic
@@ -358,12 +352,12 @@ export function App() {
               setFieldSlots((prev) => {
                 const next = [...prev];
                 next[fieldIndex] = { tileId: null };
-                next[toIndex] = { tileId: activeId };
+                next[toIndex] = { tileId: activeDragId };
                 return next;
               });
             } else {
               // field to hand
-              fieldToHand(fieldIndex, activeHandIndex);
+              fieldToHand(activeDragId!, fieldIndex, activeHandIndex);
             }
           } else {
             if (to === "field") {
@@ -375,7 +369,7 @@ export function App() {
               });
               setFieldSlots((prev) => {
                 const next = [...prev];
-                next[toIndex] = { tileId: activeId };
+                next[toIndex] = { tileId: activeDragId };
                 return next;
               });
             }
@@ -396,10 +390,20 @@ export function App() {
                 {fieldSlots.map((slot, i) => {
                   const slotId = `field_${i}`;
                   if (slot.tileId == null)
-                    return <FieldSlot key={i} id={slotId} />;
+                    return (
+                      <FieldSlot
+                        key={i}
+                        id={slotId}
+                        dropTarget={dropTargetId === slotId}
+                      />
+                    );
                   const [letter, meta] = getTile(slot.tileId);
                   return (
-                    <FieldSlot key={i} id={slotId}>
+                    <FieldSlot
+                      key={i}
+                      id={slotId}
+                      dropTarget={dropTargetId === slotId}
+                    >
                       <SortableTile
                         id={slot.tileId}
                         letter={letter}
@@ -413,10 +417,14 @@ export function App() {
             <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
               <div className="md:col-start-3 col-span-4 grid grid-cols-4 gap-2">
                 {handSlots.map((slot, i) => {
-                  if (slot.tileId == null) return <HandSlot key={i} />;
+                  const slotId = `hand_${i}`;
+                  if (slot.tileId == null)
+                    return (
+                      <HandSlot key={i} dropTarget={dropTargetId === slotId} />
+                    );
                   const [letter, meta] = getTile(slot.tileId);
                   return (
-                    <HandSlot key={i}>
+                    <HandSlot key={i} dropTarget={dropTargetId === slotId}>
                       <SortableTile
                         id={slot.tileId}
                         letter={letter}
@@ -502,8 +510,8 @@ export function App() {
         </div>
         {/* TODO dragoverlay only renders one things at a time, so "drops" while still animating are not animated */}
         <DragOverlay dropAnimation={{ duration: 150 }}>
-          {activeProps ? (
-            <Tile letter={activeProps[0]} meta={activeProps[1]} />
+          {activeDragProps ? (
+            <Tile letter={activeDragProps[0]} meta={activeDragProps[1]} />
           ) : null}
         </DragOverlay>
       </DndContext>
@@ -511,26 +519,32 @@ export function App() {
   );
 }
 
-function FieldSlot({ id, children }: { id: string; children?: ReactNode }) {
+type SlotProps = {
+  children?: ReactNode;
+  dropTarget: boolean;
+};
+
+const SLOT_CLASS =
+  "rounded border transition-shadow ease-out size-12 sm:size-24 bg-stone-200 data-[drop-target=true]:(ring ring-4 ring-blue-500 shadow-xl shadow-inset)";
+
+function FieldSlot({ id, dropTarget, children }: SlotProps & { id: string }) {
   const { setNodeRef } = useDroppable({ id });
   return (
-    <div
-      className="rounded border size-12 sm:size-24 bg-stone-400/40"
-      ref={setNodeRef}
-    >
+    <div ref={setNodeRef} className={SLOT_CLASS} data-drop-target={dropTarget}>
       {children}
     </div>
   );
 }
-function HandSlot({ children }: { children?: ReactNode }) {
+function HandSlot({ children, dropTarget }: SlotProps) {
   return (
-    <div className="rounded border size-12 sm:size-24 bg-stone-400/40">
+    <div className={SLOT_CLASS} data-drop-target={dropTarget}>
       {children}
     </div>
   );
 }
 
-const TILE_CLASS = "border size-12 sm:size-24 flex justify-center items-center";
+const TILE_CLASS =
+  "rounded-sm border font-bold text-stone-800 size-12 text-3xl sm:(size-24 text-6xl) flex justify-center items-center bg-neutral-50 select-none touch-none ";
 
 type TileProps = {
   letter: keyof Deck;
@@ -544,26 +558,24 @@ function SortableTile({ id, letter, meta }: TileProps & { id: string }) {
   };
   return (
     <div
-      className={TILE_CLASS + " bg-gray-100 select-none touch-none"}
+      className={TILE_CLASS}
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
     >
-      {letter}
+      <span>{letter}</span>
     </div>
   );
 }
 
 function Tile({ letter, meta }: TileProps) {
-  return (
-    <div className={TILE_CLASS + " bg-gray-100 select-none"}>{letter}</div>
-  );
+  return <div className={TILE_CLASS}>{letter}</div>;
 }
 
 function Move({ children, onClick }) {
   return (
-    <button className={TILE_CLASS + " rounded-full"} onClick={onClick}>
+    <button className="size-12 sm:(size-24 rounded-full)" onClick={onClick}>
       {children}
     </button>
   );
