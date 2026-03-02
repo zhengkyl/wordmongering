@@ -28,6 +28,10 @@ export function getTile(deck: Deck, tileId: string): readonly [keyof Deck, TileM
   return [letter, deck[letter]![index]] as const;
 }
 
+export function tileLetters(deck: Deck, ids: string[]): string[] {
+  return ids.map((id) => getTile(deck, id)[0] as string);
+}
+
 function tileIdsFromDeck(deck: Deck): string[] {
   const tiles = Object.entries(deck).flatMap(([letter, metas]) =>
     Array.from({ length: metas!.length }, (_, i) => `${letter}_${i}`),

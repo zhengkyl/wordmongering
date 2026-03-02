@@ -1,4 +1,4 @@
-export function X(props: React.SVGProps<SVGSVGElement>) {
+export function X(props: preact.HTMLAttributes<SVGSVGElement>) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" data-lucide {...props}>
       <path d="M18 6 6 18" />
