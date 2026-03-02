@@ -49,9 +49,6 @@ export function App() {
     );
   }, [state.hand, dictLoaded]);
 
-  const dragStartTimeRef = useRef<number>(0);
-  const hasMoved = useRef(false);
-
   // --- UI tile movement helpers (no game state involved) ---
 
   const fieldToHand = (tileId: string, fieldIndex: number) => {
@@ -101,7 +98,7 @@ export function App() {
     });
   };
 
-  const clearField = () => {
+  const resetField = () => {
     setFieldSlots(Array.from({ length: RULES.rowLen }, () => null));
     setHandSlots(Array.from({ length: RULES.handSize }, (_, i) => state.hand[i] ?? null));
   };
@@ -145,7 +142,7 @@ export function App() {
         }
         case "Backspace": {
           if (e.ctrlKey) {
-            clearField();
+            resetField();
           } else {
             for (let i = fieldSlots.length - 1; i >= 0; i--) {
               if (fieldSlots[i] != null) {
@@ -174,46 +171,25 @@ export function App() {
         <span>Plays left: {state.playsLeft}</span>
       </div>
       <DragDropProvider
-        onDragStart={() => {
-          hasMoved.current = false;
-          dragStartTimeRef.current = performance.now();
-        }}
-        onDragMove={() => {
-          hasMoved.current = true;
-        }}
         onDragEnd={(event) => {
           const { operation, canceled } = event;
+          if (canceled || !operation.source) return;
           const tileId = operation.source.id as string;
 
           const fieldIndex = fieldSlots.findIndex((id) => id === tileId);
           const handIndex = handSlots.findIndex((id) => id === tileId);
           const from = fieldIndex === -1 ? "hand" : "field";
 
-          if (canceled) return;
-
-          // Short click: move tile to the other area
-          if (!hasMoved.current && performance.now() - dragStartTimeRef.current < 200) {
-            if (from === "field") {
-              fieldToHand(tileId, fieldIndex);
-            } else {
-              handToNextField(tileId, handIndex);
-            }
-            return;
-          }
-
-          const target = operation.target;
-          if (!target) {
-            // Dropped in empty space: field tile returns to hand
+          if (!operation.target) {
+            // Dropped with no target: field tile returns to hand
             if (from === "field") fieldToHand(tileId, fieldIndex);
             return;
           }
 
-          const toIndex = parseInt((target.id as string).split("_")[1]);
+          const toIndex = parseInt((operation.target.id as string).split("_")[1]);
 
           if (from === "field") {
-            if (fieldIndex === toIndex) return;
             // TODO: maybe more advanced logic, but moving tiles seems problematic
-            if (fieldSlots[toIndex] != null) return; // occupied
             setFieldSlots((prev) => {
               const next = [...prev];
               next[fieldIndex] = null;
@@ -234,8 +210,13 @@ export function App() {
               if (tileId == null) return <FieldSlot key={i} id={slotId} />;
               const [letter, meta] = getTile(state.deck, tileId);
               return (
-                <FieldSlot key={i} id={slotId}>
-                  <SortableTile id={tileId} letter={letter} meta={meta} />
+                <FieldSlot key={i} id={slotId} disabled>
+                  <SortableTile
+                    id={tileId}
+                    letter={letter}
+                    meta={meta}
+                    onClick={() => fieldToHand(tileId, i)}
+                  />
                 </FieldSlot>
               );
             })}
@@ -269,14 +250,19 @@ export function App() {
                 const [letter, meta] = getTile(state.deck, tileId);
                 return (
                   <HandSlot key={i}>
-                    <SortableTile id={tileId} letter={letter} meta={meta} />
+                    <SortableTile
+                      id={tileId}
+                      letter={letter}
+                      meta={meta}
+                      onClick={() => handToNextField(tileId, i)}
+                    />
                   </HandSlot>
                 );
               })}
             </div>
             <div className="md:col-start-3 col-span-6 grid grid-cols-6 gap-2">
-              <Move onClick={clearField} shortcut="^⌫">
-                Clear
+              <Move onClick={resetField} shortcut="^⌫">
+                Reset
               </Move>
               <Move
                 onClick={() => {
@@ -297,7 +283,7 @@ export function App() {
                   setPlayedBest(false);
                 }}
               >
-                Redraw
+                Draw
               </Move>
               <DeckDialog deck={state.drawPile} deckMeta={state.deck} />
               <Move variant="primary" shortcut="↵" onClick={handlePlay}>
@@ -323,7 +309,7 @@ export function App() {
           </div>
         )}
         {/* TODO dragoverlay only renders one things at a time, so "drops" while still animating are not animated */}
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {(source) => {
             const [letter, meta] = getTile(state.deck, source.id as string);
             return <Tile letter={letter} meta={meta} />;
@@ -337,8 +323,8 @@ export function App() {
 const SLOT_CLASS =
   "rounded border transition-shadow ease-out size-12 sm:size-24 bg-stone-200 data-[drop-target=true]:(ring ring-4 ring-blue-500 shadow-xl shadow-inset)";
 
-function FieldSlot({ id, children }: { id: string; children?: ReactNode }) {
-  const droppable = useDroppable({ id });
+function FieldSlot({ id, disabled, children }: { id: string; disabled?: boolean; children?: ReactNode }) {
+  const droppable = useDroppable({ id, disabled });
   return (
     <div ref={droppable.ref} className={SLOT_CLASS} data-drop-target={droppable.isDropTarget}>
       {children}
@@ -358,13 +344,14 @@ type TileProps = {
   meta: TileMeta;
 };
 
-function SortableTile({ id, letter, meta }: TileProps & { id: string }) {
+function SortableTile({ id, letter, meta, onClick }: TileProps & { id: string; onClick?: () => void }) {
   const draggable = useDraggable({ id });
   return (
     <div
       ref={draggable.ref}
       className={TILE_CLASS}
       style={{ opacity: draggable.isDragging ? 0 : undefined }}
+      onClick={onClick}
     >
       <span>{letter}</span>
     </div>
