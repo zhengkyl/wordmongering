@@ -91,7 +91,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const newPlaysLeft = state.playsLeft - 1;
 
       const playedSet = new Set(action.tileIds);
-      const remainingHand = state.hand.filter((id) => !playedSet.has(id));
 
       const { drawn, newDrawPile, newDiscardPile } = drawTiles(
         action.tileIds.length,
@@ -103,9 +102,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (newScore >= RULES.targetScore) gamePhase = "won";
       else if (newPlaysLeft === 0) gamePhase = "lost";
 
+
+      const newHand = state.hand.map((id) => {
+        if (playedSet.has(id)) {
+          return drawn.pop()
+        }
+        return id
+      })
+
       return {
         ...state,
-        hand: [...remainingHand, ...drawn],
+        hand: newHand,
         drawPile: newDrawPile,
         discardPile: newDiscardPile,
         score: newScore,

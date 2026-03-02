@@ -227,84 +227,82 @@ export function App() {
           }
         }}
       >
-        <div className="grid grid-cols-[1fr_auto_1fr]">
-          <div className="m-auto">
-            <div className="grid grid-cols-4 md:grid-cols-8 gap-2 py-8">
-              {fieldSlots.map((tileId, i) => {
-                const slotId = `field_${i}`;
-                if (tileId == null) return <FieldSlot key={i} id={slotId} />;
+        <div className="w-fit m-auto">
+          <div className="grid grid-cols-4 md:grid-cols-8 gap-2 py-8">
+            {fieldSlots.map((tileId, i) => {
+              const slotId = `field_${i}`;
+              if (tileId == null) return <FieldSlot key={i} id={slotId} />;
+              const [letter, meta] = getTile(state.deck, tileId);
+              return (
+                <FieldSlot key={i} id={slotId}>
+                  <SortableTile id={tileId} letter={letter} meta={meta} />
+                </FieldSlot>
+              );
+            })}
+          </div>
+          <div className="h-14 flex flex-col items-center justify-center font-semibold gap-1">
+            {state.lastResult && (
+              <span
+                className={
+                  state.lastResult.valid
+                    ? playedBest
+                      ? "text-yellow-500"
+                      : "text-green-600"
+                    : "text-red-600"
+                }
+              >
+                {state.lastResult.valid
+                  ? `${state.lastResult.word} +${state.lastResult.pts} pts${playedBest ? " — best play!" : ""}`
+                  : `${state.lastResult.word} — not a word`}
+              </span>
+            )}
+            {playedHandSuggestions[0] && state.lastResult?.valid && !playedBest && (
+              <span className="text-stone-400 text-sm font-normal">
+                Could have played: {playedHandSuggestions[suggestionIndex]}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+            <div className="md:col-start-3 col-span-4 grid grid-cols-4 gap-2">
+              {handSlots.map((tileId, i) => {
+                if (tileId == null) return <HandSlot key={i} />;
                 const [letter, meta] = getTile(state.deck, tileId);
                 return (
-                  <FieldSlot key={i} id={slotId}>
+                  <HandSlot key={i}>
                     <SortableTile id={tileId} letter={letter} meta={meta} />
-                  </FieldSlot>
+                  </HandSlot>
                 );
               })}
             </div>
-            <div className="h-14 flex flex-col items-center justify-center font-semibold gap-1">
-              {state.lastResult && (
-                <span
-                  className={
-                    state.lastResult.valid
-                      ? playedBest
-                        ? "text-yellow-500"
-                        : "text-green-600"
-                      : "text-red-600"
-                  }
-                >
-                  {state.lastResult.valid
-                    ? `${state.lastResult.word} +${state.lastResult.pts} pts${playedBest ? " — best play!" : ""}`
-                    : `${state.lastResult.word} — not a word`}
-                </span>
-              )}
-              {playedHandSuggestions[0] && state.lastResult?.valid && !playedBest && (
-                <span className="text-stone-400 text-sm font-normal">
-                  Could have played: {playedHandSuggestions[suggestionIndex]}
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-              <div className="md:col-start-3 col-span-4 grid grid-cols-4 gap-2">
-                {handSlots.map((tileId, i) => {
-                  if (tileId == null) return <HandSlot key={i} />;
-                  const [letter, meta] = getTile(state.deck, tileId);
-                  return (
-                    <HandSlot key={i}>
-                      <SortableTile id={tileId} letter={letter} meta={meta} />
-                    </HandSlot>
-                  );
-                })}
-              </div>
-              <div className="md:col-start-3 col-span-6 grid grid-cols-6 gap-2">
-                <Move onClick={clearField} shortcut="^⌫">
-                  Clear
-                </Move>
-                <Move
-                  onClick={() => {
-                    const handTiles = handSlots.filter((id) => id != null) as string[];
-                    shuffleInPlace(handTiles);
-                    setHandSlots((prev) => {
-                      let i = 0;
-                      return prev.map((id) => (id != null ? handTiles[i++] : null));
-                    });
-                  }}
-                >
-                  Shuffle
-                </Move>
-                <Move
-                  onClick={() => {
-                    dispatch({ type: "REDRAW" });
-                    setPlayedHandSuggestions([]);
-                    setPlayedBest(false);
-                  }}
-                >
-                  Redraw
-                </Move>
-                <DeckDialog deck={state.drawPile} deckMeta={state.deck} />
-                <Move variant="primary" shortcut="↵" onClick={handlePlay}>
-                  {dictLoaded ? "Play" : "..."}
-                </Move>
-              </div>
+            <div className="md:col-start-3 col-span-6 grid grid-cols-6 gap-2">
+              <Move onClick={clearField} shortcut="^⌫">
+                Clear
+              </Move>
+              <Move
+                onClick={() => {
+                  const handTiles = handSlots.filter((id) => id != null) as string[];
+                  shuffleInPlace(handTiles);
+                  setHandSlots((prev) => {
+                    let i = 0;
+                    return prev.map((id) => (id != null ? handTiles[i++] : null));
+                  });
+                }}
+              >
+                Shuffle
+              </Move>
+              <Move
+                onClick={() => {
+                  dispatch({ type: "REDRAW" });
+                  setPlayedHandSuggestions([]);
+                  setPlayedBest(false);
+                }}
+              >
+                Redraw
+              </Move>
+              <DeckDialog deck={state.drawPile} deckMeta={state.deck} />
+              <Move variant="primary" shortcut="↵" onClick={handlePlay}>
+                {dictLoaded ? "Play" : "..."}
+              </Move>
             </div>
           </div>
         </div>
