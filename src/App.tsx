@@ -1,7 +1,6 @@
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/react";
 import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
-import { DeckDialog } from "./components/Dialog";
-import LeftDrawer from "./components/Drawer";
+import { DeckDialog } from "./components/DeckDrawer";
 import type { Deck, TileMeta } from "./lib/constants";
 import { findBestPlays, RULES } from "./lib/game";
 import { createInitialState, gameReducer, getTile, tileLetters } from "./lib/gameState";
@@ -229,7 +228,6 @@ export function App() {
         }}
       >
         <div className="grid grid-cols-[1fr_auto_1fr]">
-          <LeftDrawer></LeftDrawer>
           <div className="m-auto">
             <div className="grid grid-cols-4 md:grid-cols-8 gap-2 py-8">
               {fieldSlots.map((tileId, i) => {
@@ -302,7 +300,7 @@ export function App() {
                 >
                   Redraw
                 </Move>
-                <DeckDialog deck={state.drawPile} />
+                <DeckDialog deck={state.drawPile} deckMeta={state.deck} />
                 <Move variant="primary" shortcut="↵" onClick={handlePlay}>
                   {dictLoaded ? "Play" : "..."}
                 </Move>
