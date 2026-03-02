@@ -10,7 +10,7 @@ import {
 export function DeckDialog({ deck }) {
   return (
     <Root>
-      <DialogTrigger className="rounded-full border size-12 sm:size-24 flex justify-center items-center">
+      <DialogTrigger className="size-12 sm:size-24 rounded-lg border-2 border-stone-300 bg-white text-stone-600 hover:bg-stone-50 font-semibold text-xs sm:text-base transition-colors flex justify-center items-center">
         Deck
       </DialogTrigger>
       <DialogPortal>

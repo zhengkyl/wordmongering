@@ -1,0 +1,137 @@
+import { getStartingDeck, type Deck, type TileMeta } from "./constants";
+import { RULES, scoreWord, validateWord } from "./game";
+import { shuffleInPlace } from "./utils";
+
+export type PlayResult = { valid: boolean; word: string; pts: number };
+
+export type GameState = {
+  hand: string[];
+  drawPile: string[];
+  discardPile: string[];
+  deck: Deck;
+  score: number;
+  playsLeft: number;
+  gamePhase: "playing" | "won" | "lost";
+  lastResult: PlayResult | null;
+};
+
+export type GameAction =
+  | { type: "PLAY_WORD"; tileIds: string[]; dictionary: Set<string> | null }
+  | { type: "REDRAW" }
+  | { type: "RESET" }
+  | { type: "CLEAR_RESULT" };
+
+export function getTile(deck: Deck, tileId: string): readonly [keyof Deck, TileMeta] {
+  const split = tileId.lastIndexOf("_");
+  const letter = tileId.slice(0, split) as keyof Deck;
+  const index = parseInt(tileId.slice(split + 1));
+  return [letter, deck[letter]![index]] as const;
+}
+
+function tileIdsFromDeck(deck: Deck): string[] {
+  const tiles = Object.entries(deck).flatMap(([letter, metas]) =>
+    Array.from({ length: metas!.length }, (_, i) => `${letter}_${i}`),
+  );
+  shuffleInPlace(tiles);
+  return tiles;
+}
+
+export function createInitialState(): GameState {
+  const deck = getStartingDeck() as Deck;
+  const allTiles = tileIdsFromDeck(deck);
+  const hand = allTiles.slice(0, RULES.handSize);
+  const drawPile = allTiles.slice(RULES.handSize);
+  return {
+    hand,
+    drawPile,
+    discardPile: [],
+    deck,
+    score: 0,
+    playsLeft: RULES.playsLimit,
+    gamePhase: "playing",
+    lastResult: null,
+  };
+}
+
+function drawTiles(
+  count: number,
+  drawPile: string[],
+  discardPile: string[],
+): { drawn: string[]; newDrawPile: string[]; newDiscardPile: string[] } {
+  if (count <= drawPile.length) {
+    const dp = [...drawPile];
+    const drawn = dp.splice(0, count);
+    return { drawn, newDrawPile: dp, newDiscardPile: discardPile };
+  }
+  // Need to recycle discard
+  const recycled = [...discardPile];
+  shuffleInPlace(recycled);
+  const drawn = [...drawPile, ...recycled.splice(0, count - drawPile.length)];
+  return { drawn, newDrawPile: recycled, newDiscardPile: [] };
+}
+
+export function gameReducer(state: GameState, action: GameAction): GameState {
+  switch (action.type) {
+    case "PLAY_WORD": {
+      if (action.tileIds.length === 0) return state;
+
+      const letters = action.tileIds.map((id) => getTile(state.deck, id)[0]);
+      const word = letters.join("");
+
+      if (action.dictionary == null || !validateWord(word, action.dictionary)) {
+        return { ...state, lastResult: { valid: false, word, pts: 0 } };
+      }
+
+      const pts = scoreWord(letters);
+      const newScore = state.score + pts;
+      const newPlaysLeft = state.playsLeft - 1;
+
+      const playedSet = new Set(action.tileIds);
+      const remainingHand = state.hand.filter((id) => !playedSet.has(id));
+
+      const { drawn, newDrawPile, newDiscardPile } = drawTiles(
+        action.tileIds.length,
+        state.drawPile,
+        [...state.discardPile, ...action.tileIds],
+      );
+
+      let gamePhase: GameState["gamePhase"] = "playing";
+      if (newScore >= RULES.targetScore) gamePhase = "won";
+      else if (newPlaysLeft === 0) gamePhase = "lost";
+
+      return {
+        ...state,
+        hand: [...remainingHand, ...drawn],
+        drawPile: newDrawPile,
+        discardPile: newDiscardPile,
+        score: newScore,
+        playsLeft: newPlaysLeft,
+        gamePhase,
+        lastResult: { valid: true, word, pts },
+      };
+    }
+
+    case "REDRAW": {
+      const { drawn, newDrawPile, newDiscardPile } = drawTiles(RULES.handSize, state.drawPile, [
+        ...state.discardPile,
+        ...state.hand,
+      ]);
+      return {
+        ...state,
+        hand: drawn,
+        drawPile: newDrawPile,
+        discardPile: newDiscardPile,
+        lastResult: null,
+      };
+    }
+
+    case "RESET":
+      return createInitialState();
+
+    case "CLEAR_RESULT":
+      return { ...state, lastResult: null };
+
+    default:
+      return state;
+  }
+}
