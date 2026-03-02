@@ -1,5 +1,9 @@
 # Wordmongering
 
+> Balatro for wordcels
+
+## TODOs
+
 - what if no valid word? what if no valid play after shuffling?
 
 ## Attribution

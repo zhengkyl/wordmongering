@@ -163,12 +163,17 @@ export function App() {
   });
 
   return (
-    <div className="overflow-hidden">
-      <div className="h-12 flex items-center justify-center gap-8 bg-stone-100 px-4">
-        <span>
-          Score: {state.score} / {RULES.targetScore}
-        </span>
-        <span>Plays left: {state.playsLeft}</span>
+    <div className="h-dvh flex flex-col overflow-hidden">
+      <div
+        className="bg-stone-100 relative before:(content-[''] absolute inset-0 bg-rose-300 w-[var(--p)])"
+        style={{ "--p": `${(state.score / RULES.targetScore) * 100}%` } as any}
+      >
+        <div className="relative h-12 flex items-center justify-center gap-8 px-4 font-bold">
+          <span>
+            Score: {state.score} / {RULES.targetScore}
+          </span>
+          <span>Plays left: {state.playsLeft}</span>
+        </div>
       </div>
       <DragDropProvider
         onDragEnd={(event) => {
@@ -203,8 +208,8 @@ export function App() {
           }
         }}
       >
-        <div className="w-fit m-auto">
-          <div className="grid grid-cols-4 md:grid-cols-8 gap-2 py-8">
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="mx-auto p-4 aspect-square content-start md:(p-8 aspect-unset) grid grid-cols-4 md:grid-cols-8 gap-2">
             {fieldSlots.map((tileId, i) => {
               const slotId = `field_${i}`;
               if (tileId == null) return <FieldSlot key={i} id={slotId} />;
@@ -221,7 +226,7 @@ export function App() {
               );
             })}
           </div>
-          <div className="h-14 flex flex-col items-center justify-center font-semibold gap-1">
+          <div className="h-14 shrink-0 flex flex-col items-center justify-center font-semibold gap-1">
             {state.lastResult && (
               <span
                 className={
@@ -243,8 +248,8 @@ export function App() {
               </span>
             )}
           </div>
-          <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-            <div className="md:col-start-3 col-span-4 grid grid-cols-4 gap-2">
+          <div className="shrink-0 flex flex-col pb-2 gap-2 md:grid md:grid-cols-8 md:w-fit md:mx-auto">
+            <div className="mx-auto w-fit grid grid-cols-4 gap-2 md:mx-0 md:col-start-3 md:col-span-4">
               {handSlots.map((tileId, i) => {
                 if (tileId == null) return <HandSlot key={i} />;
                 const [letter, meta] = getTile(state.deck, tileId);
@@ -260,7 +265,7 @@ export function App() {
                 );
               })}
             </div>
-            <div className="md:col-start-3 col-span-6 grid grid-cols-6 gap-2">
+            <div className="mx-auto w-fit flex gap-2 md:mx-0 md:w-auto md:col-start-3 md:col-span-6 md:grid md:grid-cols-6">
               <Move onClick={resetField} shortcut="^⌫">
                 Reset
               </Move>
