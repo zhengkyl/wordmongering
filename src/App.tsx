@@ -1,3 +1,4 @@
+import { Dialog } from "@base-ui/react/dialog";
 import { DrawerPreview as Drawer } from "@base-ui/react/drawer";
 import { PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/react";
@@ -360,22 +361,27 @@ export function App() {
             <DeckDialog deck={state.drawPile} deckMeta={state.deck} />
           </div>
         </div>
-        {state.gamePhase !== "playing" && (
-          <div class="fixed inset-0 bg-black/60 flex items-center justify-center">
-            <div class="bg-white rounded-xl p-8 flex flex-col items-center gap-4">
-              <h1 class="text-4xl font-bold">
-                {state.gamePhase === "won" ? "You Win!" : "Game Over"}
-              </h1>
-              <p class="text-xl">Final score: {state.score}</p>
-              <button
-                class="px-6 py-2 bg-stone-800 text-white rounded-full text-lg"
-                onClick={() => dispatch({ type: "RESET" })}
-              >
-                Play Again
-              </button>
-            </div>
-          </div>
-        )}
+        <Dialog.Root
+          open={state.gamePhase !== "playing"}
+          onOpenChange={(open) => {
+            if (!open) dispatch({ type: "RESET" });
+          }}
+        >
+          <Dialog.Portal>
+            <Dialog.Backdrop class="fixed inset-0 bg-black/60" />
+            <Dialog.Popup class="fixed inset-0 flex items-center justify-center">
+              <div class="bg-white rounded-xl p-8 flex flex-col items-center gap-4">
+                <Dialog.Title class="text-4xl font-bold">
+                  {state.gamePhase === "won" ? "You Win!" : "Game Over"}
+                </Dialog.Title>
+                <p class="text-xl">Final score: {state.score}</p>
+                <Dialog.Close class="px-6 py-2 bg-stone-800 text-white rounded-full text-lg">
+                  Play Again
+                </Dialog.Close>
+              </div>
+            </Dialog.Popup>
+          </Dialog.Portal>
+        </Dialog.Root>
         {/* TODO dragoverlay only renders one things at a time, so "drops" while still animating are not animated */}
         <DragOverlay dropAnimation={shouldAnimateOverlay ? undefined : null}>
           {(source) => {
