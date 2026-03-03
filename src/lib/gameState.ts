@@ -104,7 +104,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       const newHand = state.hand.map((id) => {
         if (playedSet.has(id)) {
-          return drawn.pop();
+          return drawn.pop()!;
         }
         return id;
       });

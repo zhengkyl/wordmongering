@@ -179,7 +179,7 @@ export function App() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [slots.handSlots]);
 
-  const dragStartTime = useRef(null);
+  const dragStartTime = useRef(0);
   const [shouldAnimateOverlay, setShouldAnimateOverlay] = useState(false);
 
   return (
@@ -220,7 +220,7 @@ export function App() {
 
           const { operation } = event;
 
-          const tileId = operation.source.id as string;
+          const tileId = operation.source!.id as string;
           const fieldIndex = slots.fieldSlots.findIndex((id) => id === tileId);
           const from = fieldIndex === -1 ? "hand" : "field";
 

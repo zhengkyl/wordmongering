@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RULES } from "../lib/game";
-import { shuffleInPlace } from "../lib/utils";
+import { fill, shuffleInPlace } from "../lib/utils";
 
 function lastEmptyStart(array: any[]) {
   let lastFilled = array.length - 1;
@@ -10,6 +10,15 @@ function lastEmptyStart(array: any[]) {
     }
   }
   return lastFilled + 1;
+}
+function firstEmptyStart(array: any[]) {
+  let i = 0;
+  for (; i < array.length; i++) {
+    if (array[i] == null) {
+      break;
+    }
+  }
+  return i;
 }
 
 export function getCollapsedField(
@@ -38,15 +47,11 @@ export function getCollapsedField(
 }
 
 export function useSlots() {
-  const [fieldSlots, setFieldSlots] = useState<(string | null)[]>(
-    Array.from({ length: RULES.rowLen }, () => null),
-  );
-  const [handSlots, setHandSlots] = useState<(string | null)[]>(
-    Array.from({ length: RULES.handSize }, () => null),
-  );
+  const [fieldSlots, setFieldSlots] = useState<(string | null)[]>(fill(null, RULES.rowLen));
+  const [handSlots, setHandSlots] = useState<(string | null)[]>(fill(null, RULES.handSize));
 
   function reset(hand: string[]) {
-    setFieldSlots(Array.from({ length: RULES.rowLen }, () => null));
+    setFieldSlots(fill(null, RULES.rowLen));
     setHandSlots((prev) => {
       const drawn = hand.filter((id) => !prev.includes(id));
       let i = 0;
@@ -79,17 +84,11 @@ export function useSlots() {
 
       if (next.length < RULES.maxRows * RULES.rowLen) {
         const i = lastEmptyStart(next);
-        if (i >= next.length) {
-          for (let j = 0; j < RULES.rowLen; j++) next.push(null);
-        }
+        if (i === next.length) next.push(...fill(null, RULES.rowLen));
         next[i] = tileId;
       } else {
-        for (let i = 0; i < next.length; i++) {
-          if (next[i] == null) {
-            next[i] = tileId;
-            break;
-          }
-        }
+        const i = firstEmptyStart(next);
+        next[i] = tileId;
       }
 
       return next;
@@ -103,12 +102,9 @@ export function useSlots() {
     });
     setFieldSlots((_prev) => {
       const next = _prev.slice();
-      for (let i = 0; i < next.length; i++) {
-        if (next[i] == null) {
-          next[i] = tileId;
-          break;
-        }
-      }
+      const i = firstEmptyStart(next);
+      if (i === next.length) next.push(...fill(null, RULES.rowLen));
+      next[i] = tileId;
       return next;
     });
   }
@@ -117,7 +113,7 @@ export function useSlots() {
     const returnTiles = fieldSlots.filter((s) => s != null) as string[];
     if (!returnTiles.length) return;
 
-    setFieldSlots(Array.from({ length: RULES.rowLen }, () => null));
+    setFieldSlots(fill(null, RULES.rowLen));
     setHandSlots((_prev) => {
       const next = _prev.slice();
       for (let i = 0; i < next.length; i++) {
