@@ -1,4 +1,5 @@
 import { DrawerPreview as Drawer } from "@base-ui/react/drawer";
+import { PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/react";
 import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import type { Deck, TileMeta } from "./lib/constants";
@@ -201,6 +202,8 @@ export function App() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [handSlots]);
 
+  const dragStartTime = useRef(null);
+
   return (
     <div class="h-dvh grid [grid-template-rows:auto_auto_1fr_auto]">
       <div
@@ -237,18 +240,61 @@ export function App() {
         )}
       </div>
       <DragDropProvider
-        onDragEnd={(event) => {
-          const { operation, canceled } = event;
-          if (canceled || !operation.source) return;
-          const tileId = operation.source.id as string;
+        sensors={(defaults) => [
+          ...defaults,
+          PointerSensor.configure({
+            activationConstraints(event, _source) {
+              const { pointerType, target: _ } = event;
 
+              switch (pointerType) {
+                case "mouse":
+                  // NOTE: the default distance is too low and eats all onClick events
+                  return [new PointerActivationConstraints.Distance({ value: 10 })];
+                case "touch":
+                  return [new PointerActivationConstraints.Delay({ value: 250, tolerance: 5 })];
+                default:
+                  return [
+                    new PointerActivationConstraints.Delay({ value: 200, tolerance: 10 }),
+                    new PointerActivationConstraints.Distance({ value: 5 }),
+                  ];
+              }
+            },
+          }),
+        ]}
+        onDragStart={() => (dragStartTime.current = performance.now())}
+        onDragEnd={(event) => {
+          if (event.canceled) return;
+
+          const { operation } = event;
+
+          const tileId = operation.source.id as string;
           const fieldIndex = fieldSlots.findIndex((id) => id === tileId);
-          const handIndex = handSlots.findIndex((id) => id === tileId);
           const from = fieldIndex === -1 ? "hand" : "field";
+
+          // NOTE: False drag events bug
+          // when fast taps on mobile, must be ignored
+          // when clicking with mouse, must be treated as click
+          const isBuggedDrag = operation.transform.x === 0 && operation.transform.y === 0;
+          if (isBuggedDrag && (operation.activatorEvent as any).pointerType !== "mouse") {
+            return;
+          }
+
+          // Treat as click
+          if (isBuggedDrag || performance.now() - dragStartTime.current < 50) {
+            if (from === "field") {
+              fieldToHand(tileId, fieldIndex);
+            } else {
+              const handIndex = handSlots.findIndex((id) => id === tileId);
+              handToNextField(tileId, handIndex);
+            }
+            return;
+          }
 
           if (!operation.target) {
             // Dropped with no target: field tile returns to hand
-            if (from === "field") fieldToHand(tileId, fieldIndex);
+            if (from === "field") {
+              fieldToHand(tileId, fieldIndex);
+            }
             return;
           }
 
@@ -257,19 +303,20 @@ export function App() {
           if (from === "field") {
             // TODO: maybe more advanced logic, but moving tiles seems problematic
             setFieldSlots((prev) => {
-              const next = [...prev];
+              const next = prev.slice();
               next[fieldIndex] = null;
               next[toIndex] = tileId;
               return next;
             });
           } else {
+            const handIndex = handSlots.findIndex((id) => id === tileId);
             // Hand to field
             setHandSlots((prev) => prev.map((id, i) => (i === handIndex ? null : id)));
             setFieldSlots((prev) => prev.map((id, i) => (i === toIndex ? tileId : id)));
           }
         }}
       >
-        <div class="mx-auto w-full max-w-xl p-4 grid grid-cols-6 gap-2 sm:gap-x-4 content-center">
+        <div class="mx-auto w-full max-w-xl p-4 grid grid-cols-6 gap-2 sm:gap-4 content-center">
           {fieldSlots.map((tileId, i) => {
             const slotId = `field_${i}`;
             if (tileId == null) return <FieldSlot key={i} id={slotId} />;

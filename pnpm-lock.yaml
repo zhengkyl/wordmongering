@@ -11,6 +11,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.2.0
         version: 1.2.0(@types/react@19.1.8)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@dnd-kit/dom':
+        specifier: ^0.3.2
+        version: 0.3.2
       '@dnd-kit/helpers':
         specifier: ^0.3.2
         version: 0.3.2
