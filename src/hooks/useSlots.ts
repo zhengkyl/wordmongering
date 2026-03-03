@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { RULES } from "../lib/game";
-import { lastEmptyStart, shuffleInPlace } from "../lib/utils";
+import { shuffleInPlace } from "../lib/utils";
+
+function lastEmptyStart(array: any[]) {
+  let lastFilled = array.length - 1;
+  for (; lastFilled >= 0; lastFilled--) {
+    if (array[lastFilled] != null) {
+      break;
+    }
+  }
+  return lastFilled + 1;
+}
 
 export function getCollapsedField(
   next: (string | null)[],
@@ -58,7 +68,7 @@ export function useSlots() {
     });
   }
 
-  function handToNextField(tileId: string, handIndex: number) {
+  function handToLastField(tileId: string, handIndex: number) {
     setHandSlots((_prev) => {
       const next = _prev.slice();
       next[handIndex] = null;
@@ -82,6 +92,23 @@ export function useSlots() {
         }
       }
 
+      return next;
+    });
+  }
+  function handToFirstField(tileId: string, handIndex: number) {
+    setHandSlots((_prev) => {
+      const next = _prev.slice();
+      next[handIndex] = null;
+      return next;
+    });
+    setFieldSlots((_prev) => {
+      const next = _prev.slice();
+      for (let i = 0; i < next.length; i++) {
+        if (next[i] == null) {
+          next[i] = tileId;
+          break;
+        }
+      }
       return next;
     });
   }
@@ -116,7 +143,8 @@ export function useSlots() {
     setHandSlots,
     reset,
     fieldToHand,
-    handToNextField,
+    handToFirstField,
+    handToLastField,
     clearField,
     shuffleHand,
   };

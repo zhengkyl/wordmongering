@@ -11,7 +11,8 @@ export type GameContextValue = {
   fieldSlots: (string | null)[];
   handSlots: (string | null)[];
   fieldToHand: (tileId: string, i: number) => void;
-  handToNextField: (tileId: string, i: number) => void;
+  handToFirstField: (tileId: string, i: number) => void;
+  handToLastField: (tileId: string, i: number) => void;
   disabled: boolean;
   onShuffle: () => void;
   onDiscard: () => void;
@@ -25,7 +26,8 @@ export const GameContext = createContext<GameContextValue>({
   fieldSlots: [],
   handSlots: [],
   fieldToHand: () => {},
-  handToNextField: () => {},
+  handToFirstField: () => {},
+  handToLastField: () => {},
   disabled: false,
   onShuffle: () => {},
   onDiscard: () => {},

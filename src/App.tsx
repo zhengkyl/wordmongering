@@ -146,7 +146,7 @@ export function App() {
           return letter === letterKey;
         });
         if (handIndex === -1) return;
-        slots.handToNextField(slots.handSlots[handIndex]!, handIndex);
+        slots.handToLastField(slots.handSlots[handIndex]!, handIndex);
         e.preventDefault();
         return;
       }
@@ -235,7 +235,7 @@ export function App() {
               slots.fieldToHand(tileId, fieldIndex);
             } else {
               const handIndex = slots.handSlots.findIndex((id) => id === tileId);
-              slots.handToNextField(tileId, handIndex);
+              slots.handToFirstField(tileId, handIndex);
             }
             return;
           }
@@ -273,7 +273,8 @@ export function App() {
           fieldSlots={slots.fieldSlots}
           handSlots={slots.handSlots}
           fieldToHand={slots.fieldToHand}
-          handToNextField={slots.handToNextField}
+          handToFirstField={slots.handToFirstField}
+          handToLastField={slots.handToLastField}
           disabled={phase.type !== "idle"}
           onShuffle={slots.shuffleHand}
           onDiscard={handleDiscard}
@@ -468,7 +469,7 @@ function FieldGrid() {
 }
 
 function HandGrid() {
-  const { handSlots, handToNextField, phase, disabled, onShuffle, onDiscard, onPlay } = useGame();
+  const { handSlots, handToFirstField, phase, disabled, onShuffle, onDiscard, onPlay } = useGame();
   return (
     <div class="mx-auto w-full max-w-xl p-4 grid grid-cols-6 grid-rows-6 sm:grid-rows-5 gap-2 sm:gap-4">
       <div class="grid grid-cols-subgrid [grid-column:2/6] grid-rows-subgrid [grid-row:1/5]">
@@ -479,7 +480,7 @@ function HandGrid() {
                 key={tileId}
                 id={tileId}
                 {...getTileAnim(phase, tileId, i)}
-                onClick={() => handToNextField(tileId, i)}
+                onClick={() => handToFirstField(tileId, i)}
               />
             )}
           </HandSlot>

@@ -14,13 +14,3 @@ export function repeat<T extends TileMeta>(element: T, count: number): T[];
 export function repeat<T>(element: T, count: number): T[] {
   return Array.from({ length: count }, () => ({ ...element }));
 }
-
-export function lastEmptyStart(array: any[]) {
-  let lastFilled = array.length - 1;
-  for (; lastFilled >= 0; lastFilled--) {
-    if (array[lastFilled] != null) {
-      break;
-    }
-  }
-  return lastFilled + 1;
-}
