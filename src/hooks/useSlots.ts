@@ -37,7 +37,11 @@ export function useSlots() {
 
   function reset(hand: string[]) {
     setFieldSlots(Array.from({ length: RULES.rowLen }, () => null));
-    setHandSlots(Array.from({ length: RULES.handSize }, (_, i) => hand[i] ?? null));
+    setHandSlots((prev) => {
+      const drawn = hand.filter((id) => !prev.includes(id));
+      let i = 0;
+      return prev.map((id) => (id == null ? drawn[i++] : id));
+    });
   }
 
   function fieldToHand(tileId: string, fieldIndex: number) {

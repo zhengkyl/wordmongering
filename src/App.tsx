@@ -455,6 +455,7 @@ function FieldGrid() {
         <FieldSlot key={i} id={`field_${i}`} disabled={tileId != null}>
           {tileId != null && (
             <SortableTile
+              key={tileId}
               id={tileId}
               {...getTileAnim(phase, tileId, i)}
               onClick={() => fieldToHand(tileId, i)}
@@ -475,6 +476,7 @@ function HandGrid() {
           <HandSlot key={i}>
             {tileId != null && (
               <SortableTile
+                key={tileId}
                 id={tileId}
                 {...getTileAnim(phase, tileId, i)}
                 onClick={() => handToNextField(tileId, i)}
