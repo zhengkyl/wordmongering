@@ -3,9 +3,10 @@ import { PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/react";
 import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import { DeckDialog } from "./components/DeckDialog";
+import { GameProvider, useGame } from "./components/GameContext";
 import { usePhaseRunner } from "./hooks/usePhaseRunner";
 import { getCollapsedField, useSlots } from "./hooks/useSlots";
-import { ALPHABET, type Deck, type TileMeta } from "./lib/constants";
+import { ALPHABET, type Deck } from "./lib/constants";
 import { findBestPlays, RULES, validateWord } from "./lib/game";
 import {
   createInitialState,
@@ -265,23 +266,22 @@ export function App() {
           }
         }}
       >
-        <FieldGrid
-          fieldSlots={slots.fieldSlots}
+        <GameProvider
           deck={state.deck}
           phase={phase}
-          onTileClick={(tileId, i) => slots.fieldToHand(tileId, i)}
-        />
-        <HandGrid
-          handSlots={slots.handSlots}
-          deck={state.deck}
-          phase={phase}
-          disabled={phase.type !== "idle"}
           drawPile={state.drawPile}
+          fieldSlots={slots.fieldSlots}
+          handSlots={slots.handSlots}
+          fieldToHand={slots.fieldToHand}
+          handToNextField={slots.handToNextField}
+          disabled={phase.type !== "idle"}
           onShuffle={slots.shuffleHand}
           onDiscard={handleDiscard}
           onPlay={handlePlay}
-          onTileClick={(tileId, i) => slots.handToNextField(tileId, i)}
-        />
+        >
+          <FieldGrid />
+          <HandGrid />
+        </GameProvider>
         <Dialog.Root
           open={state.gamePhase !== "playing"}
           onOpenChange={(open) => {
@@ -306,8 +306,8 @@ export function App() {
         {/* TODO dragoverlay only renders one things at a time, so "drops" while still animating are not animated */}
         <DragOverlay dropAnimation={shouldAnimateOverlay ? undefined : null}>
           {(source) => {
-            const [letter, meta] = getTile(state.deck, source.id as string);
-            return <Tile letter={letter} meta={meta} />;
+            const [letter] = getTile(state.deck, source.id as string);
+            return <Tile letter={letter} />;
           }}
         </DragOverlay>
       </DragDropProvider>
@@ -344,19 +344,19 @@ function HandSlot({ children }: { children?: ReactNode }) {
 const TILE_CLASS =
   "font-mono h-full rounded-sm border font-bold text-stone-800 text-3xl sm:(text-6xl) flex justify-center items-center bg-neutral-50 select-none touch-none";
 
-type TileProps = {
-  letter: keyof Deck;
-  meta: TileMeta;
-};
-
 function SortableTile({
   id,
-  letter,
-  meta: _meta,
   anim,
   animDelay,
   onClick,
-}: TileProps & { id: string; anim?: string; animDelay?: string; onClick?: () => void }) {
+}: {
+  id: string;
+  anim?: string;
+  animDelay?: string;
+  onClick?: () => void;
+}) {
+  const { deck } = useGame();
+  const [letter] = getTile(deck, id);
   const { ref, isDragging, isDropping } = useDraggable({ id, disabled: anim != null });
   return (
     <div
@@ -371,7 +371,7 @@ function SortableTile({
   );
 }
 
-function Tile({ letter, meta: _meta }: TileProps) {
+function Tile({ letter }: { letter: keyof Deck }) {
   return <div class={TILE_CLASS}>{letter}</div>;
 }
 
@@ -447,83 +447,41 @@ function ResultBanner({
   );
 }
 
-function FieldGrid({
-  fieldSlots,
-  deck,
-  phase,
-  onTileClick,
-}: {
-  fieldSlots: (string | null)[];
-  deck: Deck;
-  phase: ActivePhase;
-  onTileClick: (tileId: string, i: number) => void;
-}) {
+function FieldGrid() {
+  const { fieldSlots, fieldToHand, phase } = useGame();
   return (
     <div class="mx-auto w-full max-w-xl p-4 grid grid-cols-6 gap-2 sm:gap-4 content-center">
-      {fieldSlots.map((tileId, i) => {
-        let tileContent = null;
-        if (tileId != null) {
-          const [letter, meta] = getTile(deck, tileId);
-          tileContent = (
+      {fieldSlots.map((tileId, i) => (
+        <FieldSlot key={i} id={`field_${i}`} disabled={tileId != null}>
+          {tileId != null && (
             <SortableTile
               id={tileId}
-              letter={letter}
-              meta={meta}
               {...getTileAnim(phase, tileId, i)}
-              onClick={() => onTileClick(tileId, i)}
+              onClick={() => fieldToHand(tileId, i)}
             />
-          );
-        }
-        return (
-          <FieldSlot key={i} id={`field_${i}`} disabled={tileId != null}>
-            {tileContent}
-          </FieldSlot>
-        );
-      })}
+          )}
+        </FieldSlot>
+      ))}
     </div>
   );
 }
 
-function HandGrid({
-  handSlots,
-  deck,
-  phase,
-  disabled,
-  drawPile,
-  onShuffle,
-  onDiscard,
-  onPlay,
-  onTileClick,
-}: {
-  handSlots: (string | null)[];
-  deck: Deck;
-  phase: ActivePhase;
-  disabled: boolean;
-  drawPile: string[];
-  onShuffle: () => void;
-  onDiscard: () => void;
-  onPlay: () => void;
-  onTileClick: (tileId: string, i: number) => void;
-}) {
+function HandGrid() {
+  const { handSlots, handToNextField, phase, disabled, onShuffle, onDiscard, onPlay } = useGame();
   return (
     <div class="mx-auto w-full max-w-xl p-4 grid grid-cols-6 grid-rows-6 sm:grid-rows-5 gap-2 sm:gap-4">
       <div class="grid grid-cols-subgrid [grid-column:2/6] grid-rows-subgrid [grid-row:1/5]">
-        {handSlots.map((tileId, i) => {
-          let tileContent = null;
-          if (tileId != null) {
-            const [letter, meta] = getTile(deck, tileId);
-            tileContent = (
+        {handSlots.map((tileId, i) => (
+          <HandSlot key={i}>
+            {tileId != null && (
               <SortableTile
                 id={tileId}
-                letter={letter}
-                meta={meta}
                 {...getTileAnim(phase, tileId, i)}
-                onClick={() => onTileClick(tileId, i)}
+                onClick={() => handToNextField(tileId, i)}
               />
-            );
-          }
-          return <HandSlot key={i}>{tileContent}</HandSlot>;
-        })}
+            )}
+          </HandSlot>
+        ))}
       </div>
       <div class="grid grid-cols-subgrid [grid-column:1/7] grid-rows-subgrid [grid-row:5/7]">
         <button
@@ -547,7 +505,7 @@ function HandGrid({
         >
           <div>Play</div>
         </button>
-        <DeckDialog deck={drawPile} deckMeta={deck} />
+        <DeckDialog />
       </div>
     </div>
   );

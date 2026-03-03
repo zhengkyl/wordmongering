@@ -1,15 +1,16 @@
 import { DrawerPreview as Drawer } from "@base-ui/react/drawer";
-import type { Deck } from "../lib/constants";
 import { getTile } from "../lib/gameState";
+import { useGame } from "./GameContext";
 
 const BUTTON_CLASS =
   "rounded-lg border-2 font-semibold transition-colors disabled:(opacity-50 cursor-not-allowed)";
 const SECONDARY = "border-stone-300 bg-white text-stone-600 @hover:bg-stone-50";
 
-export function DeckDialog({ deck, deckMeta }: { deck: string[]; deckMeta: Deck }) {
+export function DeckDialog() {
+  const { deck, drawPile } = useGame();
   const groups = new Map<string, { letter: string; variant: string; count: number }>();
-  for (const tileId of deck) {
-    const [letter, meta] = getTile(deckMeta, tileId);
+  for (const tileId of drawPile) {
+    const [letter, meta] = getTile(deck, tileId);
     const key = `${letter}_${meta.variant}`;
     const existing = groups.get(key);
     if (existing) {
@@ -35,7 +36,7 @@ export function DeckDialog({ deck, deckMeta }: { deck: string[]; deckMeta: Deck 
               <div class="w-10 h-1.5 rounded-full bg-stone-300" />
             </div>
             <Drawer.Title class="text-center font-semibold text-stone-800 pb-2">
-              Deck ({deck.length} remaining)
+              Deck ({sorted.reduce((acc, { count }) => acc + count, 0)} remaining)
             </Drawer.Title>
             <Drawer.Content class="overflow-y-auto px-4 pb-6 flex-1">
               <div class="flex flex-wrap gap-2 justify-center pt-2">
