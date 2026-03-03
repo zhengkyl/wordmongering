@@ -55,35 +55,8 @@ export function App() {
   const fieldToHand = (tileId: string, fieldIndex: number) => {
     setFieldSlots((_prev) => {
       const next = _prev.slice();
-
-      const row = Math.floor(fieldIndex / RULES.rowLen);
-      const rows = next.length / RULES.rowLen;
-
       next[fieldIndex] = null;
-
-      if (rows > 1) {
-        if (row === 0) {
-          let numEmpty = 0;
-          for (; numEmpty < next.length; numEmpty++) {
-            if (next[numEmpty] != null) {
-              break;
-            }
-          }
-          const emptyRows = Math.floor(numEmpty / RULES.rowLen);
-          const trimRows = Math.min(emptyRows, rows - 1);
-          if (trimRows) {
-            return next.slice(trimRows * RULES.rowLen);
-          }
-        } else if (row === rows - 1) {
-          const nonEmptyRows = Math.ceil(lastEmptyStart(next) / RULES.rowLen);
-          const keepRows = Math.max(nonEmptyRows, 1);
-          if (keepRows < rows) {
-            return next.slice(0, keepRows * RULES.rowLen);
-          }
-        }
-      }
-
-      return next;
+      return getCollapsedField(next, fieldIndex);
     });
     setHandSlots((_prev) => {
       const next = _prev.slice();
@@ -306,7 +279,7 @@ export function App() {
               const next = prev.slice();
               next[fieldIndex] = null;
               next[toIndex] = tileId;
-              return next;
+              return getCollapsedField(next, fieldIndex);
             });
           } else {
             const handIndex = handSlots.findIndex((id) => id === tileId);
@@ -465,8 +438,8 @@ function Tile({ letter, meta }: TileProps) {
 }
 
 const BUTTON_CLASS = "rounded-lg border-2 font-semibold transition-colors";
-const PRIMARY = "border-stone-800 bg-stone-800 text-white hover:bg-stone-700";
-const SECONDARY = "border-stone-300 bg-white text-stone-600 hover:bg-stone-50";
+const PRIMARY = "border-stone-800 bg-stone-800 text-white @hover:bg-stone-700";
+const SECONDARY = "border-stone-300 bg-white text-stone-600 @hover:bg-stone-50";
 
 function DeckDialog({ deck, deckMeta }: { deck: string[]; deckMeta: Deck }) {
   const groups = new Map<string, { letter: string; variant: string; count: number }>();
@@ -519,4 +492,32 @@ function DeckDialog({ deck, deckMeta }: { deck: string[]; deckMeta: Deck }) {
       </Drawer.Portal>
     </Drawer.Root>
   );
+}
+
+function getCollapsedField(next: string[], removedIndex: number) {
+  const row = Math.floor(removedIndex / RULES.rowLen);
+  const rows = next.length / RULES.rowLen;
+
+  if (rows > 1) {
+    if (row === 0) {
+      let numEmpty = 0;
+      for (; numEmpty < next.length; numEmpty++) {
+        if (next[numEmpty] != null) {
+          break;
+        }
+      }
+      const emptyRows = Math.floor(numEmpty / RULES.rowLen);
+      const trimRows = Math.min(emptyRows, rows - 1);
+      if (trimRows) {
+        return next.slice(trimRows * RULES.rowLen);
+      }
+    } else if (row === rows - 1) {
+      const nonEmptyRows = Math.ceil(lastEmptyStart(next) / RULES.rowLen);
+      const keepRows = Math.max(nonEmptyRows, 1);
+      if (keepRows < rows) {
+        return next.slice(0, keepRows * RULES.rowLen);
+      }
+    }
+  }
+  return next;
 }
