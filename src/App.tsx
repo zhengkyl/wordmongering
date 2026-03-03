@@ -4,7 +4,7 @@ import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import type { Deck, TileMeta } from "./lib/constants";
 import { findBestPlays, RULES } from "./lib/game";
 import { createInitialState, gameReducer, getTile, tileLetters } from "./lib/gameState";
-import { shuffleInPlace } from "./lib/utils";
+import { lastEmptyStart, shuffleInPlace } from "./lib/utils";
 
 // does this work with animations? how does draggable animate to original location?
 export function App() {
@@ -52,61 +52,90 @@ export function App() {
   // --- UI tile movement helpers (no game state involved) ---
 
   const fieldToHand = (tileId: string, fieldIndex: number) => {
-    setFieldSlots((prev) => {
+    setFieldSlots((_prev) => {
+      const next = _prev.slice();
+
       const row = Math.floor(fieldIndex / RULES.rowLen);
-      if (row > 0) {
-        let notEmptyIndex = prev.length - 1;
-        for (; notEmptyIndex >= 0; notEmptyIndex--) {
-          if (notEmptyIndex !== fieldIndex && prev[notEmptyIndex] != null) {
-            break;
+      const rows = next.length / RULES.rowLen;
+
+      next[fieldIndex] = null;
+
+      if (rows > 1) {
+        if (row === 0) {
+          let numEmpty = 0;
+          for (; numEmpty < next.length; numEmpty++) {
+            if (next[numEmpty] != null) {
+              break;
+            }
+          }
+          const emptyRows = Math.floor(numEmpty / RULES.rowLen);
+          const trimRows = Math.min(emptyRows, rows - 1);
+          if (trimRows) {
+            return next.slice(trimRows * RULES.rowLen);
+          }
+        } else if (row === rows - 1) {
+          const nonEmptyRows = Math.ceil(lastEmptyStart(next) / RULES.rowLen);
+          const keepRows = Math.max(nonEmptyRows, 1);
+          if (keepRows < rows) {
+            return next.slice(0, keepRows * RULES.rowLen);
           }
         }
-        const nonEmptyRows = Math.floor(notEmptyIndex / RULES.rowLen) + 1;
-
-        const newLength = nonEmptyRows * RULES.rowLen;
-        if (newLength < prev.length) {
-          return prev.slice(0, newLength);
-        }
       }
-      return prev.map((id, i) => (i === fieldIndex ? null : id));
+
+      return next;
     });
-    setHandSlots((prev) => {
-      const emptyIdx = prev.findIndex((id) => id == null);
-      if (emptyIdx === -1) return prev;
-      return prev.map((id, i) => (i === emptyIdx ? tileId : id));
+    setHandSlots((_prev) => {
+      const next = _prev.slice();
+      const emptyIdx = next.findIndex((id) => id == null);
+      next[emptyIdx] = tileId;
+      return next;
     });
   };
 
   const handToNextField = (tileId: string, handIndex: number) => {
-    setHandSlots((prev) => prev.map((id, i) => (i === handIndex ? null : id)));
-    setFieldSlots((prev) => {
-      const next = [...prev];
-      let firstEmpty = next.length;
-      let nextEmpty = 0;
-      for (let j = 0; j < next.length; j++) {
-        if (next[j] != null) {
-          nextEmpty = j + 1;
-        } else if (j < firstEmpty) {
-          firstEmpty = j;
+    setHandSlots((_prev) => {
+      const next = _prev.slice();
+      next[handIndex] = null;
+      return next;
+    });
+    setFieldSlots((_prev) => {
+      const next = _prev.slice();
+
+      if (next.length < RULES.maxRows * RULES.rowLen) {
+        const i = lastEmptyStart(next);
+        if (i >= next.length) {
+          for (let j = 0; j < RULES.rowLen; j++) {
+            next.push(null);
+          }
+        }
+        next[i] = tileId;
+      } else {
+        for (let i = 0; i < next.length; i++) {
+          if (next[i] == null) {
+            next[i] = tileId;
+            break;
+          }
         }
       }
-      if (nextEmpty >= RULES.rowLen * 2) {
-        next[firstEmpty] = tileId;
-        return next;
-      }
-      if (nextEmpty >= next.length) {
-        for (let j = 0; j < RULES.rowLen; j++) {
-          next.push(null);
-        }
-      }
-      next[nextEmpty] = tileId;
+
       return next;
     });
   };
 
   const clearField = () => {
+    const returnTiles = fieldSlots.filter((s) => s != null);
+    if (!returnTiles.length) return;
+
     setFieldSlots(Array.from({ length: RULES.rowLen }, () => null));
-    setHandSlots(Array.from({ length: RULES.handSize }, (_, i) => state.hand[i] ?? null));
+    setHandSlots((_prev) => {
+      const next = _prev.slice();
+      for (let i = 0; i < next.length; i++) {
+        if (next[i] == null) {
+          next[i] = returnTiles.pop();
+        }
+      }
+      return next;
+    });
   };
 
   const handlePlay = () => {

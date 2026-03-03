@@ -5,6 +5,7 @@ export const RULES = {
   targetScore: 100,
   playsLimit: 10,
   rowLen: 6,
+  maxRows: 3,
 };
 
 export function scoreWord(letters: string[]): number {
