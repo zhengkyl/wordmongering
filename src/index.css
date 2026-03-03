@@ -1,6 +1,10 @@
 #root {
   isolation: isolate;
 }
+body {
+  /* base-ui for safari 26+ */
+  position: relative;
+}
 
 svg[data-lucide] {
   fill: none;
@@ -33,3 +37,45 @@ svg[data-lucide] {
 .deck-drawer-popup[data-swiping] {
   transition-duration: 0ms;
 }
+
+@keyframes tile-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-28px);
+  }
+  60% {
+    transform: translateY(-10px);
+  }
+  80% {
+    transform: translateY(-18px);
+  }
+}
+
+@keyframes tile-fall {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(48px);
+    opacity: 0;
+  }
+}
+
+@keyframes tile-drop-in {
+  0% {
+    transform: translateY(-32px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+[data-anim="bounce"]  { animation: tile-bounce  0.6s ease-in-out both; }
+[data-anim="fall"]    { animation: tile-fall     0.4s ease-in    forwards; }
+[data-anim="drop-in"] { animation: tile-drop-in  0.4s ease-out   both; }

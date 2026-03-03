@@ -8,11 +8,8 @@ export const RULES = {
   maxRows: 3,
 };
 
-export function scoreWord(letters: string[]): number {
-  return letters.reduce((sum, letter) => {
-    const entry = ALPHABET[letter as keyof typeof ALPHABET];
-    return sum + (entry?.points ?? 0);
-  }, 0);
+export function scoreWord(letters: (keyof typeof ALPHABET)[]): number {
+  return letters.reduce((sum, letter) => ALPHABET[letter].points + sum, 0);
 }
 
 export function validateWord(word: string, dictionary: Set<string>): boolean {
