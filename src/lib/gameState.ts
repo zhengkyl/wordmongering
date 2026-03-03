@@ -16,10 +16,10 @@ export type GameState = {
 };
 
 export type GameAction =
-  | { type: "PLAY_WORD"; tileIds: string[]; dictionary: Set<string> | null }
-  | { type: "REDRAW" }
+  | { type: "PLAY"; tileIds: string[]; dictionary: Set<string> | null }
+  | { type: "DISCARD"; tileIds: string[] }
   | { type: "RESET" }
-  | { type: "CLEAR_RESULT" };
+  | { type: "CLEAR" };
 
 export function getTile(deck: Deck, tileId: string): readonly [keyof Deck, TileMeta] {
   const split = tileId.lastIndexOf("_");
@@ -76,7 +76,7 @@ function drawTiles(
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
-    case "PLAY_WORD": {
+    case "PLAY": {
       if (action.tileIds.length === 0) return state;
 
       const letters = action.tileIds.map((id) => getTile(state.deck, id)[0]);
@@ -102,13 +102,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (newScore >= RULES.targetScore) gamePhase = "won";
       else if (newPlaysLeft === 0) gamePhase = "lost";
 
-
       const newHand = state.hand.map((id) => {
         if (playedSet.has(id)) {
-          return drawn.pop()
+          return drawn.pop();
         }
-        return id
-      })
+        return id;
+      });
 
       return {
         ...state,
@@ -122,14 +121,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
-    case "REDRAW": {
-      const { drawn, newDrawPile, newDiscardPile } = drawTiles(RULES.handSize, state.drawPile, [
-        ...state.discardPile,
-        ...state.hand,
-      ]);
+    case "DISCARD": {
+      if (action.tileIds.length === 0) return state;
+      const playedSet = new Set(action.tileIds);
+      const { drawn, newDrawPile, newDiscardPile } = drawTiles(
+        action.tileIds.length,
+        state.drawPile,
+        [...state.discardPile, ...action.tileIds],
+      );
+      const newHand = state.hand.map((id) => (playedSet.has(id) ? drawn.pop()! : id));
       return {
         ...state,
-        hand: drawn,
+        hand: newHand,
         drawPile: newDrawPile,
         discardPile: newDiscardPile,
         lastResult: null,
@@ -139,7 +142,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "RESET":
       return createInitialState();
 
-    case "CLEAR_RESULT":
+    case "CLEAR":
       return { ...state, lastResult: null };
 
     default:

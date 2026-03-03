@@ -1,6 +1,6 @@
+import { DrawerPreview as Drawer } from "@base-ui/react/drawer";
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/react";
 import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
-import { DeckDialog } from "./components/DeckDrawer";
 import type { Deck, TileMeta } from "./lib/constants";
 import { findBestPlays, RULES } from "./lib/game";
 import { createInitialState, gameReducer, getTile, tileLetters } from "./lib/gameState";
@@ -31,7 +31,7 @@ export function App() {
       });
   }, []);
 
-  // Sync visual slots when game hand changes (after PLAY_WORD, REDRAW, RESET)
+  // Sync visual slots when game hand changes (after PLAY, DISCARD, CLEAR)
   useEffect(() => {
     setFieldSlots(Array.from({ length: RULES.rowLen }, () => null));
     setHandSlots(Array.from({ length: RULES.handSize }, (_, i) => state.hand[i] ?? null));
@@ -55,12 +55,18 @@ export function App() {
     setFieldSlots((prev) => {
       const row = Math.floor(fieldIndex / RULES.rowLen);
       if (row > 0) {
-        const rowStart = row * RULES.rowLen;
-        const rowEnd = (row + 1) * RULES.rowLen;
-        const rowEmpty = prev
-          .slice(rowStart, rowEnd)
-          .every((id, i) => i + rowStart === fieldIndex || id == null);
-        if (rowEmpty) return prev.slice(0, RULES.rowLen);
+        let notEmptyIndex = prev.length - 1;
+        for (; notEmptyIndex >= 0; notEmptyIndex--) {
+          if (notEmptyIndex !== fieldIndex && prev[notEmptyIndex] != null) {
+            break;
+          }
+        }
+        const nonEmptyRows = Math.floor(notEmptyIndex / RULES.rowLen) + 1;
+
+        const newLength = nonEmptyRows * RULES.rowLen;
+        if (newLength < prev.length) {
+          return prev.slice(0, newLength);
+        }
       }
       return prev.map((id, i) => (i === fieldIndex ? null : id));
     });
@@ -98,7 +104,7 @@ export function App() {
     });
   };
 
-  const resetField = () => {
+  const clearField = () => {
     setFieldSlots(Array.from({ length: RULES.rowLen }, () => null));
     setHandSlots(Array.from({ length: RULES.handSize }, (_, i) => state.hand[i] ?? null));
   };
@@ -112,12 +118,12 @@ export function App() {
     setPlayedHandSuggestions(currentSuggestions);
     setSuggestionIndex(Math.floor(Math.random() * currentSuggestions.length));
 
-    dispatch({ type: "PLAY_WORD", tileIds, dictionary: dictionaryRef.current });
+    dispatch({ type: "PLAY", tileIds, dictionary: dictionaryRef.current });
   };
 
   // --- Keyboard handler ---
 
-  const allowedLetters = /^[A-Za-z ]$/;
+  const allowedLetters = /^[A-Z]$/;
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const letterKey = e.key.toUpperCase();
@@ -132,7 +138,10 @@ export function App() {
           // TODO error animation
           return;
         }
+
         handToNextField(handSlots[handIndex]!, handIndex);
+        e.preventDefault();
+        return;
       }
 
       switch (e.key) {
@@ -142,7 +151,7 @@ export function App() {
         }
         case "Backspace": {
           if (e.ctrlKey) {
-            resetField();
+            clearField();
           } else {
             for (let i = fieldSlots.length - 1; i >= 0; i--) {
               if (fieldSlots[i] != null) {
@@ -156,24 +165,47 @@ export function App() {
         default:
           return;
       }
+
       e.preventDefault();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  });
+  }, [handSlots]);
 
   return (
-    <div className="h-dvh flex flex-col overflow-hidden">
+    <div class="h-dvh grid [grid-template-rows:auto_auto_1fr_auto]">
       <div
-        className="bg-stone-100 relative before:(content-[''] absolute inset-0 bg-rose-300 w-[var(--p)])"
+        class="bg-stone-100 relative before:(content-[''] absolute inset-0 bg-rose-300 w-[var(--p)])"
         style={{ "--p": `${(state.score / RULES.targetScore) * 100}%` } as any}
       >
-        <div className="relative h-12 flex items-center justify-center gap-8 px-4 font-bold">
+        <div class="relative h-10 flex items-center justify-center gap-8 px-4 font-bold">
           <span>
             Score: {state.score} / {RULES.targetScore}
           </span>
           <span>Plays left: {state.playsLeft}</span>
         </div>
+      </div>
+      <div class="h-12 flex flex-col items-center justify-center font-semibold gap-1">
+        {state.lastResult && (
+          <span
+            class={
+              state.lastResult.valid
+                ? playedBest
+                  ? "text-yellow-500"
+                  : "text-green-600"
+                : "text-red-600"
+            }
+          >
+            {state.lastResult.valid
+              ? `${state.lastResult.word} +${state.lastResult.pts} pts${playedBest ? " — best play!" : ""}`
+              : `${state.lastResult.word} — not a word`}
+          </span>
+        )}
+        {playedHandSuggestions[0] && state.lastResult?.valid && !playedBest && (
+          <span class="text-stone-400 text-sm font-normal">
+            Could have played: {playedHandSuggestions[suggestionIndex]}
+          </span>
+        )}
       </div>
       <DragDropProvider
         onDragEnd={(event) => {
@@ -208,104 +240,80 @@ export function App() {
           }
         }}
       >
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="mx-auto p-4 aspect-square content-start md:(p-8 aspect-unset) grid grid-cols-4 md:grid-cols-8 gap-2">
-            {fieldSlots.map((tileId, i) => {
-              const slotId = `field_${i}`;
-              if (tileId == null) return <FieldSlot key={i} id={slotId} />;
+        <div class="mx-auto w-full max-w-xl p-4 grid grid-cols-6 gap-2 sm:gap-x-4 content-center">
+          {fieldSlots.map((tileId, i) => {
+            const slotId = `field_${i}`;
+            if (tileId == null) return <FieldSlot key={i} id={slotId} />;
+            const [letter, meta] = getTile(state.deck, tileId);
+            return (
+              <FieldSlot key={i} id={slotId} disabled>
+                <SortableTile
+                  id={tileId}
+                  letter={letter}
+                  meta={meta}
+                  onClick={() => fieldToHand(tileId, i)}
+                />
+              </FieldSlot>
+            );
+          })}
+        </div>
+        <div class="mx-auto w-full max-w-xl p-4 grid grid-cols-6 grid-rows-6 sm:grid-rows-5 gap-2 sm:gap-4">
+          <div class="grid grid-cols-subgrid [grid-column:2/6] grid-rows-subgrid [grid-row:1/5]">
+            {handSlots.map((tileId, i) => {
+              if (tileId == null) return <HandSlot key={i} />;
               const [letter, meta] = getTile(state.deck, tileId);
               return (
-                <FieldSlot key={i} id={slotId} disabled>
+                <HandSlot key={i}>
                   <SortableTile
                     id={tileId}
                     letter={letter}
                     meta={meta}
-                    onClick={() => fieldToHand(tileId, i)}
+                    onClick={() => handToNextField(tileId, i)}
                   />
-                </FieldSlot>
+                </HandSlot>
               );
             })}
           </div>
-          <div className="h-14 shrink-0 flex flex-col items-center justify-center font-semibold gap-1">
-            {state.lastResult && (
-              <span
-                className={
-                  state.lastResult.valid
-                    ? playedBest
-                      ? "text-yellow-500"
-                      : "text-green-600"
-                    : "text-red-600"
-                }
-              >
-                {state.lastResult.valid
-                  ? `${state.lastResult.word} +${state.lastResult.pts} pts${playedBest ? " — best play!" : ""}`
-                  : `${state.lastResult.word} — not a word`}
-              </span>
-            )}
-            {playedHandSuggestions[0] && state.lastResult?.valid && !playedBest && (
-              <span className="text-stone-400 text-sm font-normal">
-                Could have played: {playedHandSuggestions[suggestionIndex]}
-              </span>
-            )}
-          </div>
-          <div className="shrink-0 flex flex-col pb-2 gap-2 md:grid md:grid-cols-8 md:w-fit md:mx-auto">
-            <div className="mx-auto w-fit grid grid-cols-4 gap-2 md:mx-0 md:col-start-3 md:col-span-4">
-              {handSlots.map((tileId, i) => {
-                if (tileId == null) return <HandSlot key={i} />;
-                const [letter, meta] = getTile(state.deck, tileId);
-                return (
-                  <HandSlot key={i}>
-                    <SortableTile
-                      id={tileId}
-                      letter={letter}
-                      meta={meta}
-                      onClick={() => handToNextField(tileId, i)}
-                    />
-                  </HandSlot>
-                );
-              })}
-            </div>
-            <div className="mx-auto w-fit flex gap-2 md:mx-0 md:w-auto md:col-start-3 md:col-span-6 md:grid md:grid-cols-6">
-              <Move onClick={resetField} shortcut="^⌫">
-                Reset
-              </Move>
-              <Move
-                onClick={() => {
-                  const handTiles = handSlots.filter((id) => id != null) as string[];
-                  shuffleInPlace(handTiles);
-                  setHandSlots((prev) => {
-                    let i = 0;
-                    return prev.map((id) => (id != null ? handTiles[i++] : null));
-                  });
-                }}
-              >
-                Shuffle
-              </Move>
-              <Move
-                onClick={() => {
-                  dispatch({ type: "REDRAW" });
-                  setPlayedHandSuggestions([]);
-                  setPlayedBest(false);
-                }}
-              >
-                Draw
-              </Move>
-              <DeckDialog deck={state.drawPile} deckMeta={state.deck} />
-              <Move variant="primary" shortcut="↵" onClick={handlePlay}>
-                {dictLoaded ? "Play" : "..."}
-              </Move>
-            </div>
+          <div class="grid grid-cols-subgrid [grid-column:1/7] grid-rows-subgrid [grid-row:5/7]">
+            <button
+              class={`${BUTTON_CLASS} ${SECONDARY} [grid-column:2/span_2] [grid-row-start:2] sm:([grid-column:initial] [grid-row:initial])`}
+              onClick={() => {
+                const handTiles = handSlots.filter((id) => id != null) as string[];
+                shuffleInPlace(handTiles);
+                setHandSlots((prev) => {
+                  let i = 0;
+                  return prev.map((id) => (id != null ? handTiles[i++] : null));
+                });
+              }}
+            >
+              <div>Shuffle</div>
+            </button>
+            <button
+              class={`${BUTTON_CLASS} ${PRIMARY} [grid-column:2/span_2]`}
+              onClick={() => {
+                const fieldTileIds = fieldSlots.filter((id) => id != null) as string[];
+                dispatch({ type: "DISCARD", tileIds: fieldTileIds });
+                setPlayedHandSuggestions([]);
+                setPlayedBest(false);
+              }}
+            >
+              <div>Discard</div>
+            </button>
+            <button class={`${BUTTON_CLASS} ${PRIMARY} [grid-column:span_2]`} onClick={handlePlay}>
+              <div>{dictLoaded ? "Play" : "..."}</div>
+            </button>
+            <DeckDialog deck={state.drawPile} deckMeta={state.deck} />
           </div>
         </div>
         {state.gamePhase !== "playing" && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
-            <div className="bg-white rounded-xl p-8 flex flex-col items-center gap-4">
-              <h1 className="text-4xl font-bold">
+          <div class="fixed inset-0 bg-black/60 flex items-center justify-center">
+            <div class="bg-white rounded-xl p-8 flex flex-col items-center gap-4">
+              <h1 class="text-4xl font-bold">
                 {state.gamePhase === "won" ? "You Win!" : "Game Over"}
               </h1>
-              <p className="text-xl">Final score: {state.score}</p>
+              <p class="text-xl">Final score: {state.score}</p>
               <button
-                className="px-6 py-2 bg-stone-800 text-white rounded-full text-lg"
+                class="px-6 py-2 bg-stone-800 text-white rounded-full text-lg"
                 onClick={() => dispatch({ type: "RESET" })}
               >
                 Play Again
@@ -326,35 +334,48 @@ export function App() {
 }
 
 const SLOT_CLASS =
-  "rounded border transition-shadow ease-out size-12 sm:size-24 bg-stone-200 data-[drop-target=true]:(ring ring-4 ring-blue-500 shadow-xl shadow-inset)";
+  "flex-1 aspect-square rounded border transition-shadow ease-out bg-stone-200 data-[drop-target=true]:(ring ring-4 ring-blue-500 shadow-xl shadow-inset)";
 
-function FieldSlot({ id, disabled, children }: { id: string; disabled?: boolean; children?: ReactNode }) {
+function FieldSlot({
+  id,
+  disabled,
+  children,
+}: {
+  id: string;
+  disabled?: boolean;
+  children?: ReactNode;
+}) {
   const droppable = useDroppable({ id, disabled });
   return (
-    <div ref={droppable.ref} className={SLOT_CLASS} data-drop-target={droppable.isDropTarget}>
+    <div ref={droppable.ref} class={SLOT_CLASS} data-drop-target={droppable.isDropTarget}>
       {children}
     </div>
   );
 }
 
 function HandSlot({ children }: { children?: ReactNode }) {
-  return <div className={SLOT_CLASS}>{children}</div>;
+  return <div class={SLOT_CLASS}>{children}</div>;
 }
 
 const TILE_CLASS =
-  "rounded-sm border font-bold text-stone-800 size-12 text-3xl sm:(size-24 text-6xl) flex justify-center items-center bg-neutral-50 select-none touch-none ";
+  "font-mono h-full rounded-sm border font-bold text-stone-800 text-3xl sm:(text-6xl) flex justify-center items-center bg-neutral-50 select-none touch-none ";
 
 type TileProps = {
   letter: keyof Deck;
   meta: TileMeta;
 };
 
-function SortableTile({ id, letter, meta, onClick }: TileProps & { id: string; onClick?: () => void }) {
+function SortableTile({
+  id,
+  letter,
+  meta,
+  onClick,
+}: TileProps & { id: string; onClick?: () => void }) {
   const draggable = useDraggable({ id });
   return (
     <div
       ref={draggable.ref}
-      className={TILE_CLASS}
+      class={TILE_CLASS}
       style={{ opacity: draggable.isDragging ? 0 : undefined }}
       onClick={onClick}
     >
@@ -364,32 +385,62 @@ function SortableTile({ id, letter, meta, onClick }: TileProps & { id: string; o
 }
 
 function Tile({ letter, meta }: TileProps) {
-  return <div className={TILE_CLASS}>{letter}</div>;
+  return <div class={TILE_CLASS}>{letter}</div>;
 }
 
-function Move({
-  children,
-  onClick,
-  variant = "default",
-  shortcut,
-}: {
-  children?: ReactNode;
-  onClick?: () => void;
-  variant?: "default" | "primary";
-  shortcut?: string;
-}) {
-  const base =
-    "size-12 sm:size-24 rounded-lg border-2 font-semibold text-xs sm:text-base transition-colors cursor-pointer flex flex-col items-center justify-center gap-0.5";
-  const styles =
-    variant === "primary"
-      ? "border-stone-800 bg-stone-800 text-white hover:bg-stone-700"
-      : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50";
+const BUTTON_CLASS = "rounded-lg border-2 font-semibold transition-colors";
+const PRIMARY = "border-stone-800 bg-stone-800 text-white hover:bg-stone-700";
+const SECONDARY = "border-stone-300 bg-white text-stone-600 hover:bg-stone-50";
+
+function DeckDialog({ deck, deckMeta }: { deck: string[]; deckMeta: Deck }) {
+  const groups = new Map<string, { letter: string; variant: string; count: number }>();
+  for (const tileId of deck) {
+    const [letter, meta] = getTile(deckMeta, tileId);
+    const key = `${letter}_${meta.variant}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.count++;
+    } else {
+      groups.set(key, { letter: letter as string, variant: meta.variant, count: 1 });
+    }
+  }
+  const sorted = [...groups.values()].sort((a, b) => a.letter.localeCompare(b.letter));
+
   return (
-    <button className={`${base} ${styles}`} onClick={onClick}>
-      <span>{children}</span>
-      {shortcut && (
-        <span className="hidden sm:block text-xs font-normal text-stone-400">{shortcut}</span>
-      )}
-    </button>
+    <Drawer.Root>
+      <Drawer.Trigger
+        class={`${BUTTON_CLASS} ${SECONDARY} [grid-column:4/span_2] [grid-row-start:2] sm:([grid-column:initial] [grid-row:initial])`}
+      >
+        Deck
+      </Drawer.Trigger>
+      <Drawer.Portal>
+        <Drawer.Backdrop class="deck-drawer-backdrop fixed inset-0 bg-black" />
+        <Drawer.Viewport class="fixed inset-0 flex items-end pointer-events-none">
+          <Drawer.Popup class="deck-drawer-popup bg-white flex flex-col w-full h-[50vh] rounded-t-2xl outline-none pointer-events-auto -mb-12">
+            <div class="flex justify-center pt-3 pb-2">
+              <div class="w-10 h-1.5 rounded-full bg-stone-300" />
+            </div>
+            <Drawer.Title class="text-center font-semibold text-stone-800 pb-2">
+              Deck ({deck.length} remaining)
+            </Drawer.Title>
+            <Drawer.Content class="overflow-y-auto px-4 pb-6 flex-1">
+              <div class="flex flex-wrap gap-2 justify-center pt-2">
+                {sorted.map(({ letter, variant, count }) => (
+                  <div
+                    key={`${letter}_${variant}`}
+                    class="relative size-10 rounded-md border-2 border-stone-300 bg-stone-50 flex items-center justify-center font-semibold text-stone-700"
+                  >
+                    {letter}
+                    <span class="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-0.5 rounded-full bg-stone-400 text-white text-[10px] leading-4 text-center font-bold">
+                      {count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Drawer.Content>
+          </Drawer.Popup>
+        </Drawer.Viewport>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }

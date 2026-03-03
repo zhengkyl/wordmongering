@@ -4,7 +4,7 @@ export const RULES = {
   handSize: 16,
   targetScore: 100,
   playsLimit: 10,
-  rowLen: 8,
+  rowLen: 6,
 };
 
 export function scoreWord(letters: string[]): number {
