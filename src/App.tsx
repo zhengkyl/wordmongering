@@ -177,6 +177,8 @@ export function App() {
 
   const dragStartTime = useRef(null);
 
+  const [shouldAnimateOverlay, setShouldAnimateOverlay] = useState(false);
+
   return (
     <div class="h-dvh grid [grid-template-rows:auto_auto_1fr_auto]">
       <div
@@ -254,6 +256,7 @@ export function App() {
 
           // Treat as click
           if (isBuggedDrag || performance.now() - dragStartTime.current < 50) {
+            setShouldAnimateOverlay(false);
             if (from === "field") {
               fieldToHand(tileId, fieldIndex);
             } else {
@@ -266,10 +269,13 @@ export function App() {
           if (!operation.target) {
             // Dropped with no target: field tile returns to hand
             if (from === "field") {
+              setShouldAnimateOverlay(false);
               fieldToHand(tileId, fieldIndex);
             }
             return;
           }
+
+          setShouldAnimateOverlay(true);
 
           const toIndex = parseInt((operation.target.id as string).split("_")[1]);
 
@@ -371,7 +377,7 @@ export function App() {
           </div>
         )}
         {/* TODO dragoverlay only renders one things at a time, so "drops" while still animating are not animated */}
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={shouldAnimateOverlay ? undefined : null}>
           {(source) => {
             const [letter, meta] = getTile(state.deck, source.id as string);
             return <Tile letter={letter} meta={meta} />;
@@ -420,12 +426,12 @@ function SortableTile({
   meta,
   onClick,
 }: TileProps & { id: string; onClick?: () => void }) {
-  const draggable = useDraggable({ id });
+  const { ref, isDragging, isDropping } = useDraggable({ id });
   return (
     <div
-      ref={draggable.ref}
+      ref={ref}
       class={TILE_CLASS}
-      style={{ opacity: draggable.isDragging ? 0 : undefined }}
+      style={{ opacity: isDragging || isDropping ? 0 : undefined }}
       onClick={onClick}
     >
       <span>{letter}</span>
