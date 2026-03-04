@@ -1,5 +1,5 @@
 import { getStartingDeck, type Deck, type TileMeta } from "./constants";
-import { RULES, scoreWord, validateWord } from "./game";
+import { RULES, scoreWord } from "./game";
 import { shuffleInPlace } from "./utils";
 
 export type PlayResult = { valid: boolean; word: string; pts: number };
@@ -11,15 +11,14 @@ export type GameState = {
   deck: Deck;
   score: number;
   playsLeft: number;
-  gamePhase: "playing" | "won" | "lost";
-  lastResult: PlayResult | null;
+  gamePhase: "playing" | "round_complete" | "lost";
 };
 
 export type GameAction =
-  | { type: "PLAY"; tileIds: string[]; dictionary: Set<string> | null }
+  | { type: "PLAY"; tileIds: string[] }
+  | { type: "DRAW"; count: number }
   | { type: "DISCARD"; tileIds: string[] }
-  | { type: "RESET" }
-  | { type: "CLEAR" };
+  | { type: "RESET" };
 
 export function getTile(deck: Deck, tileId: string): readonly [keyof Deck, TileMeta] {
   const split = tileId.lastIndexOf("_");
@@ -53,7 +52,6 @@ export function createInitialState(): GameState {
     score: 0,
     playsLeft: RULES.playsLimit,
     gamePhase: "playing",
-    lastResult: null,
   };
 }
 
@@ -75,49 +73,44 @@ function drawTiles(
 }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
+  if (import.meta.env.DEV) {
+    const a = action as any;
+    if (a.type === "DEV_SET_SCORE") return { ...state, score: a.score };
+    if (a.type === "DEV_SET_PLAYS_LEFT") return { ...state, playsLeft: a.playsLeft };
+  }
+
   switch (action.type) {
     case "PLAY": {
       if (action.tileIds.length === 0) return state;
-
+      const playedSet = new Set(action.tileIds);
       const letters = action.tileIds.map((id) => getTile(state.deck, id)[0]);
-      const word = letters.join("");
-
-      if (action.dictionary == null || !validateWord(word, action.dictionary)) {
-        return { ...state, lastResult: { valid: false, word, pts: 0 } };
-      }
-
       const pts = scoreWord(letters);
       const newScore = state.score + pts;
       const newPlaysLeft = state.playsLeft - 1;
-
-      const playedSet = new Set(action.tileIds);
-
-      const { drawn, newDrawPile, newDiscardPile } = drawTiles(
-        action.tileIds.length,
-        state.drawPile,
-        [...state.discardPile, ...action.tileIds],
-      );
-
       let gamePhase: GameState["gamePhase"] = "playing";
-      if (newScore >= RULES.targetScore) gamePhase = "won";
+      if (newScore >= RULES.targetScore) gamePhase = "round_complete";
       else if (newPlaysLeft === 0) gamePhase = "lost";
-
-      const newHand = state.hand.map((id) => {
-        if (playedSet.has(id)) {
-          return drawn.pop()!;
-        }
-        return id;
-      });
-
       return {
         ...state,
-        hand: newHand,
-        drawPile: newDrawPile,
-        discardPile: newDiscardPile,
+        hand: state.hand.filter((id) => !playedSet.has(id)),
+        discardPile: [...state.discardPile, ...action.tileIds],
         score: newScore,
         playsLeft: newPlaysLeft,
         gamePhase,
-        lastResult: { valid: true, word, pts },
+      };
+    }
+
+    case "DRAW": {
+      const { drawn, newDrawPile, newDiscardPile } = drawTiles(
+        action.count,
+        state.drawPile,
+        state.discardPile,
+      );
+      return {
+        ...state,
+        hand: [...state.hand, ...drawn],
+        drawPile: newDrawPile,
+        discardPile: newDiscardPile,
       };
     }
 
@@ -135,15 +128,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         hand: newHand,
         drawPile: newDrawPile,
         discardPile: newDiscardPile,
-        lastResult: null,
       };
     }
 
     case "RESET":
       return createInitialState();
-
-    case "CLEAR":
-      return { ...state, lastResult: null };
 
     default:
       return state;

@@ -123,6 +123,11 @@ export function useSlots() {
     });
   }
 
+  function clearSlots() {
+    setFieldSlots(fill(null, RULES.rowLen));
+    setHandSlots(fill(null, RULES.handSize));
+  }
+
   function shuffleHand() {
     setHandSlots((_prev) => {
       const handTiles = _prev.filter((id) => id != null) as string[];
@@ -138,6 +143,7 @@ export function useSlots() {
     setFieldSlots,
     setHandSlots,
     reset,
+    clearSlots,
     fieldToHand,
     handToFirstField,
     handToLastField,

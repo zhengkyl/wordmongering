@@ -1,10 +1,9 @@
-import { Dialog } from "@base-ui/react/dialog";
 import { PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/react";
-import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { useEffect, useReducer, useRef, useState, type Dispatch, type MutableRefObject, type ReactNode } from "react";
 import { DeckDialog } from "./components/DeckDialog";
 import { GameProvider, useGame } from "./components/GameContext";
-import { usePhaseRunner } from "./hooks/usePhaseRunner";
+import { usePhaseRunner, type PhaseRunner } from "./hooks/usePhaseRunner";
 import { getCollapsedField, useSlots } from "./hooks/useSlots";
 import { ALPHABET, type Deck } from "./lib/constants";
 import { findBestPlays, RULES, validateWord } from "./lib/game";
@@ -13,15 +12,35 @@ import {
   gameReducer,
   getTile,
   tileLetters,
+  type GameAction,
+  type GameState,
   type PlayResult,
 } from "./lib/gameState";
 import { DISCARD, DRAW, getTileAnim, IDLE, SCORING, type ActivePhase } from "./lib/phases";
+import { EndScreen } from "./screens/EndScreen";
+import { Shop } from "./screens/Shop";
+
+// Only imported in dev — Rollup tree-shakes this out of production builds
+// since it's only referenced inside `import.meta.env.DEV && ...`
+import { DevMenu } from "./dev/DevMenu";
+
+// --- Run-level types ---
+
+export type RoundResult = { round: number; score: number; playsUsed: number };
+export type RunStats = { rounds: RoundResult[] };
+
+type AppScreen = { type: "playing" } | { type: "shop" } | { type: "end"; won: boolean };
 
 export function App() {
   const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState);
 
   const { phase, setPhase, isActiveRef, enter, after, exit } = usePhaseRunner<ActivePhase>(IDLE);
   const slots = useSlots();
+
+  // --- Screen routing ---
+  const [screen, setScreen] = useState<AppScreen>({ type: "playing" });
+  const [round, setRound] = useState(1);
+  const [runStats, setRunStats] = useState<RunStats>({ rounds: [] });
 
   // --- Dictionary ---
   const dictionaryRef = useRef<Set<string> | null>(null);
@@ -39,18 +58,10 @@ export function App() {
 
   // --- Hand-change effect: sync slots + trigger drawing phase ---
   // prevHandRef captures the hand before each dispatch so we can diff for newly drawn tiles.
-  // isFirstHandRef skips the draw animation on the initial deal.
+  // On first render prevHandRef is empty, so all tiles are treated as new and animate in.
   const prevHandRef = useRef<string[]>([]);
-  const isFirstHandRef = useRef(true);
 
   useEffect(() => {
-    if (isFirstHandRef.current) {
-      isFirstHandRef.current = false;
-      prevHandRef.current = state.hand;
-      slots.reset(state.hand);
-      return;
-    }
-
     const prevHandSet = new Set(prevHandRef.current);
     const newTileIds = new Set(state.hand.filter((id) => !prevHandSet.has(id)));
     prevHandRef.current = state.hand;
@@ -68,7 +79,107 @@ export function App() {
     }
   }, [state.hand]);
 
+  // --- Screen transition effect ---
+  // Fires after animations complete (phase idle) to advance to shop or end screen.
+  useEffect(() => {
+    if (screen.type !== "playing") return;
+    if (phase.type !== "idle") return;
+    if (state.gamePhase === "round_complete") {
+      const result = { round, score: state.score, playsUsed: RULES.playsLimit - state.playsLeft };
+      const newStats = { rounds: [...runStats.rounds, result] };
+      setRunStats(newStats);
+      if (round >= RULES.rounds) {
+        setScreen({ type: "end", won: true });
+      } else {
+        setScreen({ type: "shop" });
+      }
+    } else if (state.gamePhase === "lost") {
+      const result = { round, score: state.score, playsUsed: RULES.playsLimit - state.playsLeft };
+      const newStats = { rounds: [...runStats.rounds, result] };
+      setRunStats(newStats);
+      setScreen({ type: "end", won: false });
+    }
+  }, [phase.type, state.gamePhase]);
+
+  // --- Run handlers ---
+
+  const handleNextRound = () => {
+    prevHandRef.current = [];
+    slots.clearSlots();
+    dispatch({ type: "RESET" });
+    setRound((r) => r + 1);
+    setScreen({ type: "playing" });
+  };
+
+  const handlePlayAgain = () => {
+    prevHandRef.current = [];
+    slots.clearSlots();
+    dispatch({ type: "RESET" });
+    setRound(1);
+    setRunStats({ rounds: [] });
+    setScreen({ type: "playing" });
+  };
+
+  return (
+    <div class="h-dvh relative">
+      {screen.type === "playing" && (
+        <PlayingScreen
+          gameState={state}
+          dispatch={dispatch}
+          runner={{ phase, setPhase, isActiveRef, enter, after, exit }}
+          slots={slots}
+          prevHandRef={prevHandRef}
+          dictionaryRef={dictionaryRef}
+          dictLoaded={dictLoaded}
+          round={round}
+        />
+      )}
+      {screen.type === "shop" && (
+        <Shop round={round} stats={runStats} onNextRound={handleNextRound} />
+      )}
+      {screen.type === "end" && (
+        <EndScreen won={screen.won} stats={runStats} onPlayAgain={handlePlayAgain} />
+      )}
+      {import.meta.env.DEV && (
+        <DevMenu
+          dispatch={dispatch as any}
+          gameState={state}
+          enter={enter}
+          exit={exit}
+          onShuffle={slots.shuffleHand}
+        />
+      )}
+    </div>
+  );
+}
+
+// --- Playing screen ---
+
+type PlayingScreenProps = {
+  gameState: GameState;
+  dispatch: Dispatch<GameAction>;
+  runner: PhaseRunner<ActivePhase>;
+  slots: ReturnType<typeof useSlots>;
+  prevHandRef: MutableRefObject<string[]>;
+  dictionaryRef: MutableRefObject<Set<string> | null>;
+  dictLoaded: boolean;
+  round: number;
+};
+
+function PlayingScreen({
+  gameState,
+  dispatch,
+  runner,
+  slots,
+  prevHandRef,
+  dictionaryRef,
+  dictLoaded,
+  round,
+}: PlayingScreenProps) {
+  const { phase, setPhase, isActiveRef, enter, after } = runner;
+
   // --- Suggestion state ---
+  const [lastResult, setLastResult] = useState<PlayResult | null>(null);
   const [currentSuggestions, setCurrentSuggestions] = useState<string[]>([]);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [playedHandSuggestions, setPlayedHandSuggestions] = useState<string[]>([]);
@@ -77,9 +188,9 @@ export function App() {
   useEffect(() => {
     if (!dictLoaded) return;
     setCurrentSuggestions(
-      findBestPlays(tileLetters(state.deck, state.hand), dictionaryRef.current!),
+      findBestPlays(tileLetters(gameState.deck, gameState.hand), dictionaryRef.current!),
     );
-  }, [state.hand, dictLoaded]);
+  }, [gameState.hand, dictLoaded]);
 
   // --- Phase handlers ---
 
@@ -93,18 +204,24 @@ export function App() {
       );
     });
     after(SCORING.STAGGER * (tiles.length - 1) + SCORING.TILE_ANIM + SCORING.POST_ANIM, () => {
-      prevHandRef.current = state.hand;
-      dispatch({ type: "PLAY", tileIds, dictionary: dictionaryRef.current });
-      // useEffect([state.hand]) transitions directly into the drawing phase
+      prevHandRef.current = gameState.hand;
+      const totalPts = tiles.reduce((sum, t) => sum + t.pts, 0);
+      const word = tiles.map((t) => t.letter).join("");
+      setLastResult({ valid: true, word, pts: totalPts });
+      dispatch({ type: "PLAY", tileIds });
+      const willContinue =
+        gameState.score + totalPts < RULES.targetScore && gameState.playsLeft - 1 > 0;
+      if (willContinue) dispatch({ type: "DRAW", count: tileIds.length });
     });
   };
 
   const handleDiscard = () => {
     const fieldTileIds = slots.fieldSlots.filter((id) => id != null) as string[];
+    setLastResult(null);
     setPlayedHandSuggestions([]);
     setPlayedBest(false);
     if (fieldTileIds.length === 0) return;
-    prevHandRef.current = state.hand;
+    prevHandRef.current = gameState.hand;
     enter({ type: "discarding", tileIds: fieldTileIds });
     after(DISCARD.FALL_ANIM, () => dispatch({ type: "DISCARD", tileIds: fieldTileIds }));
   };
@@ -112,19 +229,19 @@ export function App() {
   const handlePlay = () => {
     const tileIds = slots.fieldSlots.filter((id) => id != null) as string[];
     if (tileIds.length === 0) return;
-    const letters = tileLetters(state.deck, tileIds);
+    const letters = tileLetters(gameState.deck, tileIds);
     const word = letters.join("");
     setPlayedBest(currentSuggestions.includes(word));
     setPlayedHandSuggestions(currentSuggestions);
     setSuggestionIndex(Math.floor(Math.random() * currentSuggestions.length));
 
     if (!validateWord(word, dictionaryRef.current!)) {
-      dispatch({ type: "PLAY", tileIds, dictionary: dictionaryRef.current });
+      setLastResult({ valid: false, word, pts: 0 });
       return;
     }
 
     const tiles = tileIds.map((id) => {
-      const [letter] = getTile(state.deck, id);
+      const [letter] = getTile(gameState.deck, id);
       const pts = ALPHABET[letter as keyof typeof ALPHABET].points;
       return { letter: letter as string, pts };
     });
@@ -142,7 +259,7 @@ export function App() {
       if (allowedLetters.test(letterKey) && !e.ctrlKey && !e.metaKey) {
         const handIndex = slots.handSlots.findIndex((tileId) => {
           if (tileId == null) return false;
-          const [letter] = getTile(state.deck, tileId);
+          const [letter] = getTile(gameState.deck, tileId);
           return letter === letterKey;
         });
         if (handIndex === -1) return;
@@ -183,11 +300,11 @@ export function App() {
   const [shouldAnimateOverlay, setShouldAnimateOverlay] = useState(false);
 
   return (
-    <div class="h-dvh grid [grid-template-rows:auto_auto_1fr_auto]">
-      <ScoreBar score={state.score} playsLeft={state.playsLeft} />
+    <div class="h-full grid [grid-template-rows:auto_auto_1fr_auto]">
+      <ScoreBar score={gameState.score} playsLeft={gameState.playsLeft} round={round} />
       <ResultBanner
         phase={phase}
-        lastResult={state.lastResult}
+        lastResult={lastResult}
         playedBest={playedBest}
         playedHandSuggestions={playedHandSuggestions}
         suggestionIndex={suggestionIndex}
@@ -267,9 +384,9 @@ export function App() {
         }}
       >
         <GameProvider
-          deck={state.deck}
+          deck={gameState.deck}
           phase={phase}
-          drawPile={state.drawPile}
+          drawPile={gameState.drawPile}
           fieldSlots={slots.fieldSlots}
           handSlots={slots.handSlots}
           fieldToHand={slots.fieldToHand}
@@ -283,31 +400,10 @@ export function App() {
           <FieldGrid />
           <HandGrid />
         </GameProvider>
-        <Dialog.Root
-          open={state.gamePhase !== "playing"}
-          onOpenChange={(open) => {
-            if (!open) dispatch({ type: "RESET" });
-          }}
-        >
-          <Dialog.Portal>
-            <Dialog.Backdrop class="fixed inset-0 bg-black/60" />
-            <Dialog.Popup class="fixed inset-0 flex items-center justify-center">
-              <div class="bg-white rounded-xl p-8 flex flex-col items-center gap-4">
-                <Dialog.Title class="text-4xl font-bold">
-                  {state.gamePhase === "won" ? "You Win!" : "Game Over"}
-                </Dialog.Title>
-                <p class="text-xl">Final score: {state.score}</p>
-                <Dialog.Close class="px-6 py-2 bg-stone-800 text-white rounded-full text-lg">
-                  Play Again
-                </Dialog.Close>
-              </div>
-            </Dialog.Popup>
-          </Dialog.Portal>
-        </Dialog.Root>
         {/* TODO dragoverlay only renders one things at a time, so "drops" while still animating are not animated */}
         <DragOverlay dropAnimation={shouldAnimateOverlay ? undefined : null}>
           {(source) => {
-            const [letter] = getTile(state.deck, source.id as string);
+            const [letter] = getTile(gameState.deck, source.id as string);
             return <Tile letter={letter} />;
           }}
         </DragOverlay>
@@ -319,7 +415,7 @@ export function App() {
 // --- Shared slot/tile primitives ---
 
 const SLOT_CLASS =
-  "flex-1 aspect-square rounded border transition-shadow ease-out bg-stone-200 data-[drop-target=true]:(ring ring-4 ring-blue-500 shadow-xl shadow-inset)";
+  "flex-1 aspect-square rounded-lg border transition-shadow ease-out bg-stone-200 data-[drop-target=true]:(ring ring-4 ring-blue-500 shadow-xl shadow-inset)";
 
 function FieldSlot({
   id,
@@ -343,7 +439,7 @@ function HandSlot({ children }: { children?: ReactNode }) {
 }
 
 const TILE_CLASS =
-  "font-mono h-full rounded-sm border font-bold text-stone-800 text-3xl sm:(text-6xl) flex justify-center items-center bg-neutral-50 select-none touch-none";
+  "[container-type:inline-size] font-mono h-full rounded-lg border font-bold text-stone-800 text-3xl sm:(text-6xl) flex justify-center items-center bg-neutral-50 select-none touch-none";
 
 function SortableTile({
   id,
@@ -367,7 +463,7 @@ function SortableTile({
       style={{ opacity: isDragging || isDropping ? 0 : undefined, animationDelay: animDelay }}
       onClick={onClick}
     >
-      <span>{letter}</span>
+      <span class="[font-size:60cqw]">{letter}</span>
     </div>
   );
 }
@@ -383,13 +479,25 @@ const SECONDARY = "border-stone-300 bg-white text-stone-600 @hover:bg-stone-50";
 
 // --- Extracted components ---
 
-function ScoreBar({ score, playsLeft }: { score: number; playsLeft: number }) {
+function ScoreBar({
+  score,
+  playsLeft,
+  round,
+}: {
+  score: number;
+  playsLeft: number;
+  round: number;
+}) {
   return (
     <div
+      data-anim="scorebar-intro"
       class="bg-stone-100 relative before:(content-[''] absolute inset-0 bg-rose-300 w-[var(--p)] transition-[width] duration-700)"
-      style={{ "--p": `${(score / RULES.targetScore) * 100}%` } as any}
+      style={{ "--p": `${Math.min((score / RULES.targetScore) * 100, 100)}%` } as any}
     >
       <div class="relative h-10 flex items-center justify-center gap-8 px-4 font-bold">
+        <span>
+          Round {round} / {RULES.rounds}
+        </span>
         <span>
           Score: {score} / {RULES.targetScore}
         </span>
@@ -414,36 +522,34 @@ function ResultBanner({
 }) {
   return (
     <div class="h-12 flex flex-col items-center justify-center font-semibold gap-1">
-      {
-        phase.type === "scoring" ? (
-          <span class="text-green-600">
-            {phase.runningTotal > 0 ? `+${phase.runningTotal}` : ""}
-          </span>
-        ) : phase.type === "idle" ? (
-          <>
-            {lastResult && (
-              <span
-                class={
-                  lastResult.valid
-                    ? playedBest
-                      ? "text-yellow-500"
-                      : "text-green-600"
-                    : "text-red-600"
-                }
-              >
-                {lastResult.valid
-                  ? `${lastResult.word} +${lastResult.pts} pts${playedBest ? " — best play!" : ""}`
-                  : `${lastResult.word} — not a word`}
-              </span>
-            )}
-            {playedHandSuggestions[0] && lastResult != null && lastResult.valid && !playedBest && (
-              <span class="text-stone-400 text-sm font-normal">
-                Could have played: {playedHandSuggestions[suggestionIndex]}
-              </span>
-            )}
-          </>
-        ) : null /* discarding, drawing, future phases: silent */
-      }
+      {phase.type === "scoring" ? (
+        <span class="text-green-600">
+          {phase.runningTotal > 0 ? `+${phase.runningTotal}` : ""}
+        </span>
+      ) : phase.type === "idle" ? (
+        <>
+          {lastResult && (
+            <span
+              class={
+                lastResult.valid
+                  ? playedBest
+                    ? "text-yellow-500"
+                    : "text-green-600"
+                  : "text-red-600"
+              }
+            >
+              {lastResult.valid
+                ? `${lastResult.word} +${lastResult.pts} pts${playedBest ? " — best play!" : ""}`
+                : `${lastResult.word} — not a word`}
+            </span>
+          )}
+          {playedHandSuggestions[0] && lastResult != null && lastResult.valid && !playedBest && (
+            <span class="text-stone-400 text-sm font-normal">
+              Could have played: {playedHandSuggestions[suggestionIndex]}
+            </span>
+          )}
+        </>
+      ) : null /* discarding, drawing, future phases: silent */}
     </div>
   );
 }
@@ -451,7 +557,7 @@ function ResultBanner({
 function FieldGrid() {
   const { fieldSlots, fieldToHand, phase } = useGame();
   return (
-    <div class="mx-auto w-full max-w-xl p-4 grid grid-cols-6 gap-2 sm:gap-4 content-center">
+    <div class="mx-auto w-full max-w-[calc(600px+(600px-2rem+0.5rem)/3)] p-4 grid grid-cols-8 gap-2 max-w-[calc(600px+(600px+1rem)/4)]) content-center">
       {fieldSlots.map((tileId, i) => (
         <FieldSlot key={i} id={`field_${i}`} disabled={tileId != null}>
           {tileId != null && (
@@ -471,7 +577,7 @@ function FieldGrid() {
 function HandGrid() {
   const { handSlots, handToFirstField, phase, disabled, onShuffle, onDiscard, onPlay } = useGame();
   return (
-    <div class="mx-auto w-full max-w-xl p-4 grid grid-cols-6 grid-rows-6 sm:grid-rows-5 gap-2 sm:gap-4">
+    <div class="mx-auto w-full max-w-[600px] p-4 grid grid-cols-6 grid-rows-6 sm:grid-rows-5 gap-2">
       <div class="grid grid-cols-subgrid [grid-column:2/6] grid-rows-subgrid [grid-row:1/5]">
         {handSlots.map((tileId, i) => (
           <HandSlot key={i}>

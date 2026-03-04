@@ -4,8 +4,9 @@ export const RULES = {
   handSize: 16,
   targetScore: 100,
   playsLimit: 10,
-  rowLen: 6,
-  maxRows: 3,
+  rowLen: 8,
+  maxRows: 2,
+  rounds: 10,
 };
 
 export function scoreWord(letters: (keyof typeof ALPHABET)[]): number {
