@@ -1,5 +1,5 @@
 import { getStartingDeck, type Deck, type TileMeta } from "./constants";
-import { RULES, scoreWord } from "./game";
+import { RULES } from "./game";
 import { shuffleInPlace } from "./utils";
 
 export type PlayResult = { valid: boolean; word: string; pts: number };
@@ -11,11 +11,12 @@ export type GameState = {
   deck: Deck;
   score: number;
   playsLeft: number;
+  discardsLeft: number;
   gamePhase: "playing" | "round_complete" | "lost";
 };
 
 export type GameAction =
-  | { type: "PLAY"; tileIds: string[] }
+  | { type: "PLAY"; tileIds: string[]; pts: number }
   | { type: "DRAW"; count: number }
   | { type: "DISCARD"; tileIds: string[] }
   | { type: "RESET" };
@@ -51,6 +52,7 @@ export function createInitialState(): GameState {
     deck,
     score: 0,
     playsLeft: RULES.playsLimit,
+    discardsLeft: RULES.discardsLimit,
     gamePhase: "playing",
   };
 }
@@ -83,9 +85,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "PLAY": {
       if (action.tileIds.length === 0) return state;
       const playedSet = new Set(action.tileIds);
-      const letters = action.tileIds.map((id) => getTile(state.deck, id)[0]);
-      const pts = scoreWord(letters);
-      const newScore = state.score + pts;
+      const newScore = state.score + action.pts;
       const newPlaysLeft = state.playsLeft - 1;
       let gamePhase: GameState["gamePhase"] = "playing";
       if (newScore >= RULES.targetScore) gamePhase = "round_complete";
@@ -128,6 +128,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         hand: newHand,
         drawPile: newDrawPile,
         discardPile: newDiscardPile,
+        discardsLeft: state.discardsLeft - 1,
       };
     }
 

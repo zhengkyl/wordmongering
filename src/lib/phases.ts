@@ -2,13 +2,25 @@
 // add startXxxPhase handler in App, add render branches in FieldGrid/HandGrid/ResultBanner
 export type ActivePhase =
   | { type: "idle" }
-  | { type: "scoring"; tiles: { letter: string; pts: number }[]; tileIds: string[]; runningTotal: number }
+  | {
+      type: "scoring";
+      tileIds: string[];
+      tileAnimDelays: string[];
+      step: { tileIndex: number; powerUpIndex: number; pts: number } | null;
+      runningTotal: number;
+    }
   | { type: "discarding"; tileIds: string[] }
   | { type: "drawing"; newTileIds: Set<string> };
 
 export const IDLE: ActivePhase = { type: "idle" };
 
-export const SCORING = { STAGGER: 50, PEAK_OFFSET: 200, TILE_ANIM: 600, POST_ANIM: 200 } as const;
+export const SCORING = {
+  PEAK_OFFSET: 200,
+  TILE_ANIM: 500,
+  TILE_OVERLAP: 100,
+  POST_ANIM: 200,
+  POWERUP_DISPLAY: 500,
+} as const;
 export const DISCARD = { FALL_ANIM: 400 } as const;
 export const DRAW = { STAGGER: 30, ANIM: 400 } as const;
 
@@ -20,7 +32,7 @@ export function getTileAnim(
 ): { anim?: string; animDelay?: string } {
   if (phase.type === "scoring") {
     const wordIndex = phase.tileIds.indexOf(tileId);
-    if (wordIndex !== -1) return { anim: "bounce", animDelay: `${wordIndex * SCORING.STAGGER}ms` };
+    if (wordIndex !== -1) return { anim: "bounce", animDelay: phase.tileAnimDelays[wordIndex] };
   }
   if (phase.type === "discarding" && phase.tileIds.includes(tileId)) {
     return { anim: "fall" };

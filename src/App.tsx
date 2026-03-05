@@ -1,6 +1,14 @@
 import { PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/react";
-import { useEffect, useReducer, useRef, useState, type Dispatch, type MutableRefObject, type ReactNode } from "react";
+import {
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+  type Dispatch,
+  type MutableRefObject,
+  type ReactNode,
+} from "react";
 import { DeckDialog } from "./components/DeckDialog";
 import { GameProvider, useGame } from "./components/GameContext";
 import { usePhaseRunner, type PhaseRunner } from "./hooks/usePhaseRunner";
@@ -17,7 +25,9 @@ import {
   type PlayResult,
 } from "./lib/gameState";
 import { DISCARD, DRAW, getTileAnim, IDLE, SCORING, type ActivePhase } from "./lib/phases";
+import { POWER_UPS, type PowerUpDef, type PowerUpId } from "./lib/powerups";
 import { EndScreen } from "./screens/EndScreen";
+import { Earnings } from "./screens/Earnings";
 import { Shop } from "./screens/Shop";
 
 // Only imported in dev — Rollup tree-shakes this out of production builds
@@ -26,10 +36,10 @@ import { DevMenu } from "./dev/DevMenu";
 
 // --- Run-level types ---
 
-export type RoundResult = { round: number; score: number; playsUsed: number };
+export type RoundResult = { round: number; score: number; playsUsed: number; discardsUsed: number };
 export type RunStats = { rounds: RoundResult[] };
 
-type AppScreen = { type: "playing" } | { type: "shop" } | { type: "end"; won: boolean };
+type AppScreen = { type: "playing" } | { type: "earnings" } | { type: "shop" } | { type: "end"; won: boolean };
 
 export function App() {
   const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState);
@@ -41,6 +51,8 @@ export function App() {
   const [screen, setScreen] = useState<AppScreen>({ type: "playing" });
   const [round, setRound] = useState(1);
   const [runStats, setRunStats] = useState<RunStats>({ rounds: [] });
+  const [inventory, setInventory] = useState<PowerUpId[]>([]);
+  const [pennies, setPennies] = useState(0);
 
   // --- Dictionary ---
   const dictionaryRef = useRef<Set<string> | null>(null);
@@ -85,16 +97,17 @@ export function App() {
     if (screen.type !== "playing") return;
     if (phase.type !== "idle") return;
     if (state.gamePhase === "round_complete") {
-      const result = { round, score: state.score, playsUsed: RULES.playsLimit - state.playsLeft };
+      const result = { round, score: state.score, playsUsed: RULES.playsLimit - state.playsLeft, discardsUsed: RULES.discardsLimit - state.discardsLeft };
       const newStats = { rounds: [...runStats.rounds, result] };
       setRunStats(newStats);
+      setPennies((prev) => prev + 10 + 2 * state.playsLeft + state.discardsLeft);
       if (round >= RULES.rounds) {
         setScreen({ type: "end", won: true });
       } else {
-        setScreen({ type: "shop" });
+        setScreen({ type: "earnings" });
       }
     } else if (state.gamePhase === "lost") {
-      const result = { round, score: state.score, playsUsed: RULES.playsLimit - state.playsLeft };
+      const result = { round, score: state.score, playsUsed: RULES.playsLimit - state.playsLeft, discardsUsed: RULES.discardsLimit - state.discardsLeft };
       const newStats = { rounds: [...runStats.rounds, result] };
       setRunStats(newStats);
       setScreen({ type: "end", won: false });
@@ -103,7 +116,11 @@ export function App() {
 
   // --- Run handlers ---
 
-  const handleNextRound = () => {
+  const handleContinueToShop = () => setScreen({ type: "shop" });
+
+  const handleNextRound = (acquired: PowerUpId | null, penniesSpent: number) => {
+    if (acquired != null) setInventory((prev) => [...prev, acquired]);
+    setPennies((prev) => prev - penniesSpent);
     prevHandRef.current = [];
     slots.clearSlots();
     dispatch({ type: "RESET" });
@@ -117,6 +134,7 @@ export function App() {
     dispatch({ type: "RESET" });
     setRound(1);
     setRunStats({ rounds: [] });
+    setPennies(0);
     setScreen({ type: "playing" });
   };
 
@@ -132,10 +150,14 @@ export function App() {
           dictionaryRef={dictionaryRef}
           dictLoaded={dictLoaded}
           round={round}
+          inventory={inventory}
         />
       )}
+      {screen.type === "earnings" && (
+        <Earnings round={round} stats={runStats} pennies={pennies} onContinue={handleContinueToShop} />
+      )}
       {screen.type === "shop" && (
-        <Shop round={round} stats={runStats} onNextRound={handleNextRound} />
+        <Shop pennies={pennies} onNextRound={handleNextRound} />
       )}
       {screen.type === "end" && (
         <EndScreen won={screen.won} stats={runStats} onPlayAgain={handlePlayAgain} />
@@ -164,6 +186,7 @@ type PlayingScreenProps = {
   dictionaryRef: MutableRefObject<Set<string> | null>;
   dictLoaded: boolean;
   round: number;
+  inventory: PowerUpId[];
 };
 
 function PlayingScreen({
@@ -175,6 +198,7 @@ function PlayingScreen({
   dictionaryRef,
   dictLoaded,
   round,
+  inventory,
 }: PlayingScreenProps) {
   const { phase, setPhase, isActiveRef, enter, after } = runner;
 
@@ -194,23 +218,95 @@ function PlayingScreen({
 
   // --- Phase handlers ---
 
-  const startScoringPhase = (tiles: { letter: string; pts: number }[], tileIds: string[]) => {
-    enter({ type: "scoring", tiles, tileIds, runningTotal: 0 });
-    tiles.forEach((tile, i) => {
-      after(SCORING.STAGGER * i + SCORING.PEAK_OFFSET, () =>
+  const startScoringPhase = (tileIds: string[], activePowerUps: PowerUpDef[]) => {
+    const rawTiles = tileIds.map((id) => {
+      const [letter] = getTile(gameState.deck, id);
+      return { letter: letter as string, pts: ALPHABET[letter as keyof typeof ALPHABET].points };
+    });
+
+    // Pre-compute per-tile power-up chains: tilePtsChains[i] = [basePts, afterPu0, afterPu1, ...]
+    const tilePtsChains = rawTiles.map((rawTile, i) => {
+      const chain = [rawTile.pts];
+      for (const pu of activePowerUps) {
+        chain.push(
+          pu.onTile({ letter: rawTile.letter, pts: chain[chain.length - 1] }, i, rawTiles),
+        );
+      }
+      return chain;
+    });
+
+    // Pre-compute onEnd chain
+    const tileTotal = tilePtsChains.reduce((s, chain) => s + chain[chain.length - 1], 0);
+    const scoredTiles = rawTiles.map((t, i) => ({
+      letter: t.letter,
+      pts: tilePtsChains[i][tilePtsChains[i].length - 1],
+    }));
+    const endChain = [tileTotal];
+    for (const pu of activePowerUps)
+      endChain.push(pu.onEnd(endChain[endChain.length - 1], scoredTiles));
+    const finalTotal = endChain[endChain.length - 1];
+
+    const perTileDuration = Math.max(
+      SCORING.TILE_ANIM - SCORING.TILE_OVERLAP,
+      SCORING.PEAK_OFFSET + activePowerUps.length * SCORING.POWERUP_DISPLAY,
+    );
+    const tileAnimDelays = rawTiles.map((_, i) => `${i * perTileDuration}ms`);
+
+    enter({ type: "scoring", tileIds, tileAnimDelays, step: null, runningTotal: 0 });
+
+    rawTiles.forEach((_, i) => {
+      const tileStart = i * perTileDuration;
+
+      after(tileStart + SCORING.PEAK_OFFSET, () =>
         setPhase((p) =>
-          p.type === "scoring" ? { ...p, runningTotal: p.runningTotal + tile.pts } : p,
+          p.type === "scoring"
+            ? { ...p, step: { tileIndex: i, powerUpIndex: -1, pts: tilePtsChains[i][0] } }
+            : p,
+        ),
+      );
+
+      for (let j = 0; j < activePowerUps.length; j++) {
+        after(tileStart + SCORING.PEAK_OFFSET + (j + 1) * SCORING.POWERUP_DISPLAY, () =>
+          setPhase((p) =>
+            p.type === "scoring"
+              ? { ...p, step: { tileIndex: i, powerUpIndex: j, pts: tilePtsChains[i][j + 1] } }
+              : p,
+          ),
+        );
+      }
+
+      after(tileStart + perTileDuration, () =>
+        setPhase((p) =>
+          p.type === "scoring"
+            ? {
+                ...p,
+                step: null,
+                runningTotal: p.runningTotal + tilePtsChains[i][tilePtsChains[i].length - 1],
+              }
+            : p,
         ),
       );
     });
-    after(SCORING.STAGGER * (tiles.length - 1) + SCORING.TILE_ANIM + SCORING.POST_ANIM, () => {
+
+    const endStart = rawTiles.length * perTileDuration + SCORING.POST_ANIM;
+
+    for (let j = 0; j < activePowerUps.length; j++) {
+      after(endStart + j * SCORING.POWERUP_DISPLAY, () =>
+        setPhase((p) =>
+          p.type === "scoring"
+            ? { ...p, step: { tileIndex: tileIds.length, powerUpIndex: j, pts: endChain[j + 1] } }
+            : p,
+        ),
+      );
+    }
+
+    after(endStart + activePowerUps.length * SCORING.POWERUP_DISPLAY + SCORING.POST_ANIM, () => {
       prevHandRef.current = gameState.hand;
-      const totalPts = tiles.reduce((sum, t) => sum + t.pts, 0);
-      const word = tiles.map((t) => t.letter).join("");
-      setLastResult({ valid: true, word, pts: totalPts });
-      dispatch({ type: "PLAY", tileIds });
+      const word = rawTiles.map((t) => t.letter).join("");
+      setLastResult({ valid: true, word, pts: finalTotal });
+      dispatch({ type: "PLAY", tileIds, pts: finalTotal });
       const willContinue =
-        gameState.score + totalPts < RULES.targetScore && gameState.playsLeft - 1 > 0;
+        gameState.score + finalTotal < RULES.targetScore && gameState.playsLeft - 1 > 0;
       if (willContinue) dispatch({ type: "DRAW", count: tileIds.length });
     });
   };
@@ -240,12 +336,8 @@ function PlayingScreen({
       return;
     }
 
-    const tiles = tileIds.map((id) => {
-      const [letter] = getTile(gameState.deck, id);
-      const pts = ALPHABET[letter as keyof typeof ALPHABET].points;
-      return { letter: letter as string, pts };
-    });
-    startScoringPhase(tiles, tileIds);
+    const activePowerUps = inventory.map((id) => POWER_UPS[id]);
+    startScoringPhase(tileIds, activePowerUps);
   };
 
   // --- Keyboard handler ---
@@ -301,7 +393,7 @@ function PlayingScreen({
 
   return (
     <div class="h-full grid [grid-template-rows:auto_auto_1fr_auto]">
-      <ScoreBar score={gameState.score} playsLeft={gameState.playsLeft} round={round} />
+      <ScoreBar score={gameState.score} playsLeft={gameState.playsLeft} discardsLeft={gameState.discardsLeft} round={round} />
       <ResultBanner
         phase={phase}
         lastResult={lastResult}
@@ -393,6 +485,7 @@ function PlayingScreen({
           handToFirstField={slots.handToFirstField}
           handToLastField={slots.handToLastField}
           disabled={phase.type !== "idle"}
+          discardsLeft={gameState.discardsLeft}
           onShuffle={slots.shuffleHand}
           onDiscard={handleDiscard}
           onPlay={handlePlay}
@@ -482,10 +575,12 @@ const SECONDARY = "border-stone-300 bg-white text-stone-600 @hover:bg-stone-50";
 function ScoreBar({
   score,
   playsLeft,
+  discardsLeft,
   round,
 }: {
   score: number;
   playsLeft: number;
+  discardsLeft: number;
   round: number;
 }) {
   return (
@@ -502,6 +597,7 @@ function ScoreBar({
           Score: {score} / {RULES.targetScore}
         </span>
         <span>Plays left: {playsLeft}</span>
+        <span>Discards left: {discardsLeft}</span>
       </div>
     </div>
   );
@@ -522,34 +618,41 @@ function ResultBanner({
 }) {
   return (
     <div class="h-12 flex flex-col items-center justify-center font-semibold gap-1">
-      {phase.type === "scoring" ? (
-        <span class="text-green-600">
-          {phase.runningTotal > 0 ? `+${phase.runningTotal}` : ""}
-        </span>
-      ) : phase.type === "idle" ? (
-        <>
-          {lastResult && (
-            <span
-              class={
-                lastResult.valid
-                  ? playedBest
-                    ? "text-yellow-500"
-                    : "text-green-600"
-                  : "text-red-600"
-              }
-            >
-              {lastResult.valid
-                ? `${lastResult.word} +${lastResult.pts} pts${playedBest ? " — best play!" : ""}`
-                : `${lastResult.word} — not a word`}
-            </span>
-          )}
-          {playedHandSuggestions[0] && lastResult != null && lastResult.valid && !playedBest && (
-            <span class="text-stone-400 text-sm font-normal">
-              Could have played: {playedHandSuggestions[suggestionIndex]}
-            </span>
-          )}
-        </>
-      ) : null /* discarding, drawing, future phases: silent */}
+      {
+        phase.type === "scoring" ? (
+          <span class="text-green-600">
+            {phase.runningTotal > 0 ? `+${phase.runningTotal}` : ""}
+            {phase.step != null
+              ? phase.step.tileIndex < phase.tileIds.length
+                ? ` [+${phase.step.pts}]`
+                : ` [end: +${phase.step.pts - phase.runningTotal}]`
+              : ""}
+          </span>
+        ) : phase.type === "idle" ? (
+          <>
+            {lastResult && (
+              <span
+                class={
+                  lastResult.valid
+                    ? playedBest
+                      ? "text-yellow-500"
+                      : "text-green-600"
+                    : "text-red-600"
+                }
+              >
+                {lastResult.valid
+                  ? `${lastResult.word} +${lastResult.pts} pts${playedBest ? " — best play!" : ""}`
+                  : `${lastResult.word} — not a word`}
+              </span>
+            )}
+            {playedHandSuggestions[0] && lastResult != null && lastResult.valid && !playedBest && (
+              <span class="text-stone-400 text-sm font-normal">
+                Could have played: {playedHandSuggestions[suggestionIndex]}
+              </span>
+            )}
+          </>
+        ) : null /* discarding, drawing, future phases: silent */
+      }
     </div>
   );
 }
@@ -575,7 +678,7 @@ function FieldGrid() {
 }
 
 function HandGrid() {
-  const { handSlots, handToFirstField, phase, disabled, onShuffle, onDiscard, onPlay } = useGame();
+  const { handSlots, handToFirstField, phase, disabled, discardsLeft, onShuffle, onDiscard, onPlay } = useGame();
   return (
     <div class="mx-auto w-full max-w-[600px] p-4 grid grid-cols-6 grid-rows-6 sm:grid-rows-5 gap-2">
       <div class="grid grid-cols-subgrid [grid-column:2/6] grid-rows-subgrid [grid-row:1/5]">
@@ -602,7 +705,7 @@ function HandGrid() {
         </button>
         <button
           class={`${BUTTON_CLASS} ${PRIMARY} [grid-column:2/span_2]`}
-          disabled={disabled}
+          disabled={disabled || discardsLeft === 0}
           onClick={onDiscard}
         >
           <div>Discard</div>

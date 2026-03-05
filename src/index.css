@@ -76,6 +76,13 @@ svg[data-lucide] {
   }
 }
 
+@keyframes penny-pop {
+  0%   { transform: scale(0); }
+  70%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+[data-anim="penny-pop"]       { animation: penny-pop         0.2s ease-out   both; }
 [data-anim="bounce"]          { animation: tile-bounce      0.6s ease-in-out both; }
 [data-anim="fall"]            { animation: tile-fall         0.4s ease-in    forwards; }
 [data-anim="drop-in"]         { animation: tile-drop-in      0.4s ease-out   both; }

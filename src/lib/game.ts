@@ -4,6 +4,7 @@ export const RULES = {
   handSize: 16,
   targetScore: 100,
   playsLimit: 10,
+  discardsLimit: 5,
   rowLen: 8,
   maxRows: 2,
   rounds: 10,
