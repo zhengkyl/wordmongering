@@ -122,7 +122,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         state.drawPile,
         [...state.discardPile, ...action.tileIds],
       );
-      const newHand = state.hand.map((id) => (playedSet.has(id) ? drawn.pop()! : id));
+      const newHand = state.hand.map((id) => (playedSet.has(id) ? drawn.shift()! : id));
       return {
         ...state,
         hand: newHand,

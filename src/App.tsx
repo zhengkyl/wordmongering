@@ -86,7 +86,7 @@ export function App() {
 
     if (newTileIds.size > 0 && prevHand.length > 0) {
       enter({ type: "drawing" });
-      after(newTileIds.size * 500 + 200, exit);
+      after(newTileIds.size * 222 + 200, exit);
     } else {
       exit();
     }
@@ -321,7 +321,6 @@ function PlayingScreen({
       const willContinue =
         gameState.score + finalTotal < RULES.targetScore && gameState.playsLeft - 1 > 0;
       snapshotHandSlotsRef.current = slots.handSlots.slice();
-      snapshotDrawPileRef.current = gameState.drawPile.slice();
       dispatch({ type: "PLAY", tileIds, pts: finalTotal });
       if (willContinue) dispatch({ type: "DRAW", count: tileIds.length });
     });
@@ -337,7 +336,6 @@ function PlayingScreen({
     enter({ type: "discarding", tileIds: fieldTileIds });
     after(DISCARD.FALL_ANIM, () => {
       snapshotHandSlotsRef.current = slots.handSlots.slice();
-      snapshotDrawPileRef.current = gameState.drawPile.slice();
       dispatch({ type: "DISCARD", tileIds: fieldTileIds });
     });
   };
@@ -409,7 +407,6 @@ function PlayingScreen({
   }, [slots.handSlots]);
 
   const snapshotHandSlotsRef = useRef<(string | null)[]>([]);
-  const snapshotDrawPileRef = useRef<string[]>([]);
 
   const dragStartTime = useRef(0);
   const [shouldAnimateOverlay, setShouldAnimateOverlay] = useState(false);
@@ -520,7 +517,6 @@ function PlayingScreen({
               onDiscard={handleDiscard}
               onPlay={handlePlay}
               snapshotHandSlotsRef={snapshotHandSlotsRef}
-              snapshotDrawPileRef={snapshotDrawPileRef}
             >
               <FieldGrid />
               <HandGrid />
@@ -689,6 +685,7 @@ function ResultBanner({
 
 const QUEUE_COLS = 4;
 const HAND_ROWS = RULES.handSize / QUEUE_COLS;
+const HAND_SLOTS = HAND_ROWS * QUEUE_COLS;
 
 function snakeIndex(row: number, col: number): number {
   return row % 2 === 0 ? row * QUEUE_COLS + col : row * QUEUE_COLS + (QUEUE_COLS - 1 - col);
@@ -699,7 +696,7 @@ function getSnakeHandSlots(handSlots: (string | null)[]) {
   for (let r = 0; r < HAND_ROWS; r++) {
     for (let c = 0; c < QUEUE_COLS; c++) {
       const slotIndex = snakeIndex(r, c);
-      result.push({ tileId: handSlots[slotIndex] ?? null, slotIndex });
+      result.push({ tileId: handSlots[slotIndex], slotIndex });
     }
   }
   return result;
@@ -707,15 +704,11 @@ function getSnakeHandSlots(handSlots: (string | null)[]) {
 
 function getSnakeDeckItems(drawPile: string[]) {
   const rows = Math.ceil(drawPile.length / QUEUE_COLS);
-  const result: { tileId: string | null; queuePos: number }[] = [];
+  const result: (string | null)[] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < QUEUE_COLS; c++) {
-      const queuePos = snakeIndex(HAND_ROWS + r, c);
-      const deckIndex = queuePos - HAND_ROWS * QUEUE_COLS;
-      result.push({
-        tileId: deckIndex >= 0 && deckIndex < drawPile.length ? drawPile[deckIndex] : null,
-        queuePos,
-      });
+      const idx = snakeIndex(r, c);
+      result.push(idx < drawPile.length ? drawPile[idx] : null);
     }
   }
   return result;
@@ -770,10 +763,10 @@ function HandGrid() {
       const dy = before.y - r.top;
       if (Math.abs(dx) + Math.abs(dy) < 1) continue;
       for (const a of el.getAnimations()) a.cancel();
-      el.animate(
-        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }],
-        { duration: 350, easing: "ease-out" },
-      );
+      el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], {
+        duration: 150,
+        easing: "ease-out",
+      });
     }
     beforePosRef.current = new Map();
   });
@@ -785,7 +778,9 @@ function HandGrid() {
     }
 
     const snapshotHand = snapshotHandSlotsRef.current;
-    const drawnTiles = handSlots.filter((id): id is string => id != null && !snapshotHand.includes(id));
+    const drawnTiles = handSlots.filter(
+      (id): id is string => id != null && !snapshotHand.includes(id),
+    );
     let current: (string | null)[] = [...snapshotHand, ...drawnTiles];
     setAnimSlots(current);
 
@@ -800,20 +795,26 @@ function HandGrid() {
 
       let rightmostNull = -1;
       for (let i = current.length - 1; i >= 0; i--) {
-        if (current[i] === null) { rightmostNull = i; break; }
+        if (current[i] === null) {
+          rightmostNull = i;
+          break;
+        }
       }
-      if (rightmostNull === -1) { clearInterval(intervalId); return; }
-      current = current.slice();
-      current.splice(rightmostNull, 1);
-      setAnimSlots(current.slice());
-    }, 500);
+      if (rightmostNull === -1) {
+        clearInterval(intervalId);
+        return;
+      }
+      current = current.filter((_, i) => i !== rightmostNull);
+      setAnimSlots(current);
+    }, 222);
 
     return () => clearInterval(intervalId);
   }, [phase.type]);
 
-  const HAND_SLOTS = HAND_ROWS * QUEUE_COLS;
   const displayHandSlots = animSlots ? animSlots.slice(0, HAND_SLOTS) : handSlots;
-  const transitioning = animSlots ? (animSlots.slice(HAND_SLOTS).filter((id): id is string => id != null)) : [];
+  const transitioning = animSlots
+    ? animSlots.slice(HAND_SLOTS).filter((id): id is string => id != null)
+    : [];
   const displayDeck = transitioning.length > 0 ? [...transitioning, ...drawPile] : drawPile;
 
   const snakeHand = getSnakeHandSlots(displayHandSlots);
@@ -828,7 +829,10 @@ function HandGrid() {
               {tileId != null && (
                 <div
                   class="h-full"
-                  ref={(el) => { if (el) tileRefs.current.set(tileId, el); else tileRefs.current.delete(tileId); }}
+                  ref={(el) => {
+                    if (el) tileRefs.current.set(tileId, el);
+                    else tileRefs.current.delete(tileId);
+                  }}
                 >
                   <SortableTile
                     key={tileId}
@@ -847,11 +851,15 @@ function HandGrid() {
               <div class="flex-1 border-t border-stone-300" />
             </div>
           )}
-          {snakeDeck.map(({ tileId, queuePos }) => (
+          {snakeDeck.map((tileId, i) => (
             <div
-              key={queuePos}
+              key={tileId ?? `slot-${i}`}
               class="aspect-square opacity-40"
-              ref={(el) => { if (el && tileId != null) tileRefs.current.set(tileId, el); else if (tileId != null) tileRefs.current.delete(tileId); }}
+              ref={(el) => {
+                if (tileId == null) return;
+                if (el) tileRefs.current.set(tileId, el);
+                else tileRefs.current.delete(tileId);
+              }}
             >
               {tileId != null && <Tile letter={getTile(deck, tileId)[0]} />}
             </div>
