@@ -18,6 +18,8 @@ export type GameContextValue = {
   onShuffle: () => void;
   onDiscard: () => void;
   onPlay: () => void;
+  snapshotHandSlotsRef: { current: (string | null)[] };
+  snapshotDrawPileRef: { current: string[] };
 };
 
 export const GameContext = createContext<GameContextValue>({
@@ -34,6 +36,8 @@ export const GameContext = createContext<GameContextValue>({
   onShuffle: () => {},
   onDiscard: () => {},
   onPlay: () => {},
+  snapshotHandSlotsRef: { current: [] },
+  snapshotDrawPileRef: { current: [] },
 });
 
 export const useGame = () => useContext(GameContext);

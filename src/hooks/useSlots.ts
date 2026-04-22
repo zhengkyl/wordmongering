@@ -52,10 +52,13 @@ export function useSlots() {
 
   function reset(hand: string[]) {
     setFieldSlots(fill(null, RULES.rowLen));
-    setHandSlots((prev) => {
-      const drawn = hand.filter((id) => !prev.includes(id));
-      let i = 0;
-      return prev.map((id) => (id == null ? drawn[i++] : id));
+    setHandSlots((_prev) => {
+      const handSet = new Set(hand);
+      const prevExisting = _prev.filter((id): id is string => id != null);
+      const prevExistingSet = new Set(prevExisting);
+      const kept = prevExisting.filter((id) => handSet.has(id));
+      const newTiles = hand.filter((id) => !prevExistingSet.has(id));
+      return [...kept, ...newTiles];
     });
   }
 

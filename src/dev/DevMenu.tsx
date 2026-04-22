@@ -67,9 +67,9 @@ export function DevMenu({ dispatch, gameState, enter, exit, onShuffle }: DevMenu
             <div class="font-bold text-stone-500 mb-2">PHASE — {gameState.gamePhase}</div>
             <div class="flex gap-1 flex-wrap">
               <button class={SECONDARY_BTN} onClick={() => exit()}>→ idle</button>
-              <button class={SECONDARY_BTN} onClick={() => enter({ type: "scoring", tiles: [{ letter: "A", pts: 1 }], tileIds: [], runningTotal: 0 })}>→ scoring</button>
+              <button class={SECONDARY_BTN} onClick={() => enter({ type: "scoring", tileIds: [], tileAnimDelays: [], step: null, runningTotal: 0 })}>→ scoring</button>
               <button class={SECONDARY_BTN} onClick={() => enter({ type: "discarding", tileIds: [] })}>→ discard</button>
-              <button class={SECONDARY_BTN} onClick={() => enter({ type: "drawing", newTileIds: new Set() })}>→ drawing</button>
+              <button class={SECONDARY_BTN} onClick={() => enter({ type: "drawing" })}>→ drawing</button>
             </div>
           </section>
 

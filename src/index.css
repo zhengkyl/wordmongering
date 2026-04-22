@@ -14,29 +14,6 @@ svg[data-lucide] {
   stroke-linejoin: round;
 }
 
-.deck-drawer-backdrop {
-  opacity: calc(0.4 * (1 - var(--drawer-swipe-progress)));
-  transition: opacity 450ms;
-}
-.deck-drawer-backdrop[data-starting-style],
-.deck-drawer-backdrop[data-ending-style] {
-  opacity: 0;
-}
-
-.deck-drawer-popup {
-  transform: translateY(var(--drawer-swipe-movement-y));
-  transition: transform 450ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-.deck-drawer-popup[data-starting-style],
-.deck-drawer-popup[data-ending-style] {
-  transform: translateY(calc(100% - var(--bleed, 3rem)));
-}
-.deck-drawer-popup[data-ending-style] {
-  transition-duration: calc(var(--drawer-swipe-strength) * 400ms);
-}
-.deck-drawer-popup[data-swiping] {
-  transition-duration: 0ms;
-}
 
 @keyframes tile-bounce {
   0%,

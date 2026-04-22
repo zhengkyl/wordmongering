@@ -2,6 +2,7 @@ import { PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/react";
 import {
   useEffect,
+  useLayoutEffect,
   useReducer,
   useRef,
   useState,
@@ -9,7 +10,6 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from "react";
-import { DeckDialog } from "./components/DeckDialog";
 import { GameProvider, useGame } from "./components/GameContext";
 import { usePhaseRunner, type PhaseRunner } from "./hooks/usePhaseRunner";
 import { getCollapsedField, useSlots } from "./hooks/useSlots";
@@ -24,10 +24,10 @@ import {
   type GameState,
   type PlayResult,
 } from "./lib/gameState";
-import { DISCARD, DRAW, getTileAnim, IDLE, SCORING, type ActivePhase } from "./lib/phases";
+import { DISCARD, getTileAnim, IDLE, SCORING, type ActivePhase } from "./lib/phases";
 import { POWER_UPS, type PowerUpDef, type PowerUpId } from "./lib/powerups";
-import { EndScreen } from "./screens/EndScreen";
 import { Earnings } from "./screens/Earnings";
+import { EndScreen } from "./screens/EndScreen";
 import { Shop } from "./screens/Shop";
 
 // Only imported in dev — Rollup tree-shakes this out of production builds
@@ -39,7 +39,11 @@ import { DevMenu } from "./dev/DevMenu";
 export type RoundResult = { round: number; score: number; playsUsed: number; discardsUsed: number };
 export type RunStats = { rounds: RoundResult[] };
 
-type AppScreen = { type: "playing" } | { type: "earnings" } | { type: "shop" } | { type: "end"; won: boolean };
+type AppScreen =
+  | { type: "playing" }
+  | { type: "earnings" }
+  | { type: "shop" }
+  | { type: "end"; won: boolean };
 
 export function App() {
   const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState);
@@ -73,19 +77,16 @@ export function App() {
   // On first render prevHandRef is empty, so all tiles are treated as new and animate in.
   const prevHandRef = useRef<string[]>([]);
 
-  useEffect(() => {
-    const prevHandSet = new Set(prevHandRef.current);
+  useLayoutEffect(() => {
+    const prevHand = prevHandRef.current;
+    const prevHandSet = new Set(prevHand);
     const newTileIds = new Set(state.hand.filter((id) => !prevHandSet.has(id)));
     prevHandRef.current = state.hand;
     slots.reset(state.hand);
 
-    if (newTileIds.size > 0) {
-      const maxSlotIdx = state.hand.reduce(
-        (max, id, i) => (newTileIds.has(id) ? Math.max(max, i) : max),
-        0,
-      );
-      enter({ type: "drawing", newTileIds });
-      after(maxSlotIdx * DRAW.STAGGER + DRAW.ANIM, exit);
+    if (newTileIds.size > 0 && prevHand.length > 0) {
+      enter({ type: "drawing" });
+      after(newTileIds.size * 500 + 200, exit);
     } else {
       exit();
     }
@@ -97,7 +98,12 @@ export function App() {
     if (screen.type !== "playing") return;
     if (phase.type !== "idle") return;
     if (state.gamePhase === "round_complete") {
-      const result = { round, score: state.score, playsUsed: RULES.playsLimit - state.playsLeft, discardsUsed: RULES.discardsLimit - state.discardsLeft };
+      const result = {
+        round,
+        score: state.score,
+        playsUsed: RULES.playsLimit - state.playsLeft,
+        discardsUsed: RULES.discardsLimit - state.discardsLeft,
+      };
       const newStats = { rounds: [...runStats.rounds, result] };
       setRunStats(newStats);
       setPennies((prev) => prev + 10 + 2 * state.playsLeft + state.discardsLeft);
@@ -107,7 +113,12 @@ export function App() {
         setScreen({ type: "earnings" });
       }
     } else if (state.gamePhase === "lost") {
-      const result = { round, score: state.score, playsUsed: RULES.playsLimit - state.playsLeft, discardsUsed: RULES.discardsLimit - state.discardsLeft };
+      const result = {
+        round,
+        score: state.score,
+        playsUsed: RULES.playsLimit - state.playsLeft,
+        discardsUsed: RULES.discardsLimit - state.discardsLeft,
+      };
       const newStats = { rounds: [...runStats.rounds, result] };
       setRunStats(newStats);
       setScreen({ type: "end", won: false });
@@ -154,11 +165,14 @@ export function App() {
         />
       )}
       {screen.type === "earnings" && (
-        <Earnings round={round} stats={runStats} pennies={pennies} onContinue={handleContinueToShop} />
+        <Earnings
+          round={round}
+          stats={runStats}
+          pennies={pennies}
+          onContinue={handleContinueToShop}
+        />
       )}
-      {screen.type === "shop" && (
-        <Shop pennies={pennies} onNextRound={handleNextRound} />
-      )}
+      {screen.type === "shop" && <Shop pennies={pennies} onNextRound={handleNextRound} />}
       {screen.type === "end" && (
         <EndScreen won={screen.won} stats={runStats} onPlayAgain={handlePlayAgain} />
       )}
@@ -304,9 +318,11 @@ function PlayingScreen({
       prevHandRef.current = gameState.hand;
       const word = rawTiles.map((t) => t.letter).join("");
       setLastResult({ valid: true, word, pts: finalTotal });
-      dispatch({ type: "PLAY", tileIds, pts: finalTotal });
       const willContinue =
         gameState.score + finalTotal < RULES.targetScore && gameState.playsLeft - 1 > 0;
+      snapshotHandSlotsRef.current = slots.handSlots.slice();
+      snapshotDrawPileRef.current = gameState.drawPile.slice();
+      dispatch({ type: "PLAY", tileIds, pts: finalTotal });
       if (willContinue) dispatch({ type: "DRAW", count: tileIds.length });
     });
   };
@@ -319,7 +335,11 @@ function PlayingScreen({
     if (fieldTileIds.length === 0) return;
     prevHandRef.current = gameState.hand;
     enter({ type: "discarding", tileIds: fieldTileIds });
-    after(DISCARD.FALL_ANIM, () => dispatch({ type: "DISCARD", tileIds: fieldTileIds }));
+    after(DISCARD.FALL_ANIM, () => {
+      snapshotHandSlotsRef.current = slots.handSlots.slice();
+      snapshotDrawPileRef.current = gameState.drawPile.slice();
+      dispatch({ type: "DISCARD", tileIds: fieldTileIds });
+    });
   };
 
   const handlePlay = () => {
@@ -388,12 +408,20 @@ function PlayingScreen({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [slots.handSlots]);
 
+  const snapshotHandSlotsRef = useRef<(string | null)[]>([]);
+  const snapshotDrawPileRef = useRef<string[]>([]);
+
   const dragStartTime = useRef(0);
   const [shouldAnimateOverlay, setShouldAnimateOverlay] = useState(false);
 
   return (
-    <div class="h-full grid [grid-template-rows:auto_auto_1fr_auto]">
-      <ScoreBar score={gameState.score} playsLeft={gameState.playsLeft} discardsLeft={gameState.discardsLeft} round={round} />
+    <div class="h-full flex flex-col">
+      <ScoreBar
+        score={gameState.score}
+        playsLeft={gameState.playsLeft}
+        discardsLeft={gameState.discardsLeft}
+        round={round}
+      />
       <ResultBanner
         phase={phase}
         lastResult={lastResult}
@@ -401,106 +429,112 @@ function PlayingScreen({
         playedHandSuggestions={playedHandSuggestions}
         suggestionIndex={suggestionIndex}
       />
-      <DragDropProvider
-        sensors={(defaults) => [
-          ...defaults,
-          PointerSensor.configure({
-            activationConstraints(event, _source) {
-              const { pointerType, target: _ } = event;
+      <div class="flex-1 min-h-0">
+        <DragDropProvider
+          sensors={(defaults) => [
+            ...defaults,
+            PointerSensor.configure({
+              activationConstraints(event, _source) {
+                const { pointerType, target: _ } = event;
 
-              switch (pointerType) {
-                case "mouse":
-                  return [new PointerActivationConstraints.Distance({ value: 10 })];
-                case "touch":
-                  return [new PointerActivationConstraints.Delay({ value: 250, tolerance: 5 })];
-                default:
-                  return [
-                    new PointerActivationConstraints.Delay({ value: 200, tolerance: 10 }),
-                    new PointerActivationConstraints.Distance({ value: 5 }),
-                  ];
+                switch (pointerType) {
+                  case "mouse":
+                    return [new PointerActivationConstraints.Distance({ value: 10 })];
+                  case "touch":
+                    return [new PointerActivationConstraints.Delay({ value: 250, tolerance: 5 })];
+                  default:
+                    return [
+                      new PointerActivationConstraints.Delay({ value: 200, tolerance: 10 }),
+                      new PointerActivationConstraints.Distance({ value: 5 }),
+                    ];
+                }
+              },
+            }),
+          ]}
+          onDragStart={() => (dragStartTime.current = performance.now())}
+          onDragEnd={(event) => {
+            if (event.canceled) return;
+            if (isActiveRef.current) return;
+
+            const { operation } = event;
+
+            const tileId = operation.source!.id as string;
+            const fieldIndex = slots.fieldSlots.findIndex((id) => id === tileId);
+            const from = fieldIndex === -1 ? "hand" : "field";
+
+            const isBuggedDrag = operation.transform.x === 0 && operation.transform.y === 0;
+            if (isBuggedDrag && (operation.activatorEvent as any).pointerType !== "mouse") {
+              return;
+            }
+
+            if (isBuggedDrag || performance.now() - dragStartTime.current < 50) {
+              setShouldAnimateOverlay(false);
+              if (from === "field") {
+                slots.fieldToHand(tileId, fieldIndex);
+              } else {
+                const handIndex = slots.handSlots.findIndex((id) => id === tileId);
+                slots.handToFirstField(tileId, handIndex);
               }
-            },
-          }),
-        ]}
-        onDragStart={() => (dragStartTime.current = performance.now())}
-        onDragEnd={(event) => {
-          if (event.canceled) return;
-          if (isActiveRef.current) return;
+              return;
+            }
 
-          const { operation } = event;
+            if (!operation.target) {
+              if (from === "field") {
+                setShouldAnimateOverlay(false);
+                slots.fieldToHand(tileId, fieldIndex);
+              }
+              return;
+            }
 
-          const tileId = operation.source!.id as string;
-          const fieldIndex = slots.fieldSlots.findIndex((id) => id === tileId);
-          const from = fieldIndex === -1 ? "hand" : "field";
+            setShouldAnimateOverlay(true);
 
-          const isBuggedDrag = operation.transform.x === 0 && operation.transform.y === 0;
-          if (isBuggedDrag && (operation.activatorEvent as any).pointerType !== "mouse") {
-            return;
-          }
+            const toIndex = parseInt((operation.target.id as string).split("_")[1]);
 
-          if (isBuggedDrag || performance.now() - dragStartTime.current < 50) {
-            setShouldAnimateOverlay(false);
             if (from === "field") {
-              slots.fieldToHand(tileId, fieldIndex);
+              slots.setFieldSlots((prev) => {
+                const next = prev.slice();
+                next[fieldIndex] = null;
+                next[toIndex] = tileId;
+                return getCollapsedField(next, fieldIndex);
+              });
             } else {
               const handIndex = slots.handSlots.findIndex((id) => id === tileId);
-              slots.handToFirstField(tileId, handIndex);
+              slots.setHandSlots((prev) => prev.map((id, i) => (i === handIndex ? null : id)));
+              slots.setFieldSlots((prev) => prev.map((id, i) => (i === toIndex ? tileId : id)));
             }
-            return;
-          }
-
-          if (!operation.target) {
-            if (from === "field") {
-              setShouldAnimateOverlay(false);
-              slots.fieldToHand(tileId, fieldIndex);
-            }
-            return;
-          }
-
-          setShouldAnimateOverlay(true);
-
-          const toIndex = parseInt((operation.target.id as string).split("_")[1]);
-
-          if (from === "field") {
-            slots.setFieldSlots((prev) => {
-              const next = prev.slice();
-              next[fieldIndex] = null;
-              next[toIndex] = tileId;
-              return getCollapsedField(next, fieldIndex);
-            });
-          } else {
-            const handIndex = slots.handSlots.findIndex((id) => id === tileId);
-            slots.setHandSlots((prev) => prev.map((id, i) => (i === handIndex ? null : id)));
-            slots.setFieldSlots((prev) => prev.map((id, i) => (i === toIndex ? tileId : id)));
-          }
-        }}
-      >
-        <GameProvider
-          deck={gameState.deck}
-          phase={phase}
-          drawPile={gameState.drawPile}
-          fieldSlots={slots.fieldSlots}
-          handSlots={slots.handSlots}
-          fieldToHand={slots.fieldToHand}
-          handToFirstField={slots.handToFirstField}
-          handToLastField={slots.handToLastField}
-          disabled={phase.type !== "idle"}
-          discardsLeft={gameState.discardsLeft}
-          onShuffle={slots.shuffleHand}
-          onDiscard={handleDiscard}
-          onPlay={handlePlay}
-        >
-          <FieldGrid />
-          <HandGrid />
-        </GameProvider>
-        {/* TODO dragoverlay only renders one things at a time, so "drops" while still animating are not animated */}
-        <DragOverlay dropAnimation={shouldAnimateOverlay ? undefined : null}>
-          {(source) => {
-            const [letter] = getTile(gameState.deck, source.id as string);
-            return <Tile letter={letter} />;
           }}
-        </DragOverlay>
-      </DragDropProvider>
+        >
+          <div class="h-full flex flex-col">
+            <GameProvider
+              deck={gameState.deck}
+              phase={phase}
+              drawPile={gameState.drawPile}
+              fieldSlots={slots.fieldSlots}
+              handSlots={slots.handSlots}
+              fieldToHand={slots.fieldToHand}
+              handToFirstField={slots.handToFirstField}
+              handToLastField={slots.handToLastField}
+              disabled={phase.type !== "idle"}
+              discardsLeft={gameState.discardsLeft}
+              onShuffle={slots.shuffleHand}
+              onDiscard={handleDiscard}
+              onPlay={handlePlay}
+              snapshotHandSlotsRef={snapshotHandSlotsRef}
+              snapshotDrawPileRef={snapshotDrawPileRef}
+            >
+              <FieldGrid />
+              <HandGrid />
+            </GameProvider>
+          </div>
+          {/* TODO dragoverlay only renders one things at a time, so "drops" while still animating are not animated */}
+          <DragOverlay dropAnimation={shouldAnimateOverlay ? undefined : null}>
+            {(source) => {
+              const [letter] = getTile(gameState.deck, source.id as string);
+              return <Tile letter={letter} />;
+            }}
+          </DragOverlay>
+        </DragDropProvider>
+      </div>
     </div>
   );
 }
@@ -525,10 +559,6 @@ function FieldSlot({
       {children}
     </div>
   );
-}
-
-function HandSlot({ children }: { children?: ReactNode }) {
-  return <div class={SLOT_CLASS}>{children}</div>;
 }
 
 const TILE_CLASS =
@@ -657,6 +687,40 @@ function ResultBanner({
   );
 }
 
+const QUEUE_COLS = 4;
+const HAND_ROWS = RULES.handSize / QUEUE_COLS;
+
+function snakeIndex(row: number, col: number): number {
+  return row % 2 === 0 ? row * QUEUE_COLS + col : row * QUEUE_COLS + (QUEUE_COLS - 1 - col);
+}
+
+function getSnakeHandSlots(handSlots: (string | null)[]) {
+  const result: { tileId: string | null; slotIndex: number }[] = [];
+  for (let r = 0; r < HAND_ROWS; r++) {
+    for (let c = 0; c < QUEUE_COLS; c++) {
+      const slotIndex = snakeIndex(r, c);
+      result.push({ tileId: handSlots[slotIndex] ?? null, slotIndex });
+    }
+  }
+  return result;
+}
+
+function getSnakeDeckItems(drawPile: string[]) {
+  const rows = Math.ceil(drawPile.length / QUEUE_COLS);
+  const result: { tileId: string | null; queuePos: number }[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < QUEUE_COLS; c++) {
+      const queuePos = snakeIndex(HAND_ROWS + r, c);
+      const deckIndex = queuePos - HAND_ROWS * QUEUE_COLS;
+      result.push({
+        tileId: deckIndex >= 0 && deckIndex < drawPile.length ? drawPile[deckIndex] : null,
+        queuePos,
+      });
+    }
+  }
+  return result;
+}
+
 function FieldGrid() {
   const { fieldSlots, fieldToHand, phase } = useGame();
   return (
@@ -678,46 +742,140 @@ function FieldGrid() {
 }
 
 function HandGrid() {
-  const { handSlots, handToFirstField, phase, disabled, discardsLeft, onShuffle, onDiscard, onPlay } = useGame();
+  const {
+    deck,
+    handSlots,
+    drawPile,
+    handToFirstField,
+    phase,
+    disabled,
+    discardsLeft,
+    onShuffle,
+    onDiscard,
+    onPlay,
+    snapshotHandSlotsRef,
+  } = useGame();
+
+  const [animSlots, setAnimSlots] = useState<(string | null)[] | null>(null);
+  const tileRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const beforePosRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+
+  // FLIP: fires after every render; animates tiles from snapshotted positions to their new positions
+  useLayoutEffect(() => {
+    for (const [id, el] of tileRefs.current) {
+      const before = beforePosRef.current.get(id);
+      if (!before) continue;
+      const r = el.getBoundingClientRect();
+      const dx = before.x - r.left;
+      const dy = before.y - r.top;
+      if (Math.abs(dx) + Math.abs(dy) < 1) continue;
+      for (const a of el.getAnimations()) a.cancel();
+      el.animate(
+        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }],
+        { duration: 350, easing: "ease-out" },
+      );
+    }
+    beforePosRef.current = new Map();
+  });
+
+  useLayoutEffect(() => {
+    if (phase.type !== "drawing") {
+      setAnimSlots(null);
+      return;
+    }
+
+    const snapshotHand = snapshotHandSlotsRef.current;
+    const drawnTiles = handSlots.filter((id): id is string => id != null && !snapshotHand.includes(id));
+    let current: (string | null)[] = [...snapshotHand, ...drawnTiles];
+    setAnimSlots(current);
+
+    const intervalId = setInterval(() => {
+      // Snapshot positions before update so FLIP effect can animate from old to new
+      const snap = new Map<string, { x: number; y: number }>();
+      for (const [id, el] of tileRefs.current) {
+        const r = el.getBoundingClientRect();
+        snap.set(id, { x: r.left, y: r.top });
+      }
+      beforePosRef.current = snap;
+
+      let rightmostNull = -1;
+      for (let i = current.length - 1; i >= 0; i--) {
+        if (current[i] === null) { rightmostNull = i; break; }
+      }
+      if (rightmostNull === -1) { clearInterval(intervalId); return; }
+      current = current.slice();
+      current.splice(rightmostNull, 1);
+      setAnimSlots(current.slice());
+    }, 500);
+
+    return () => clearInterval(intervalId);
+  }, [phase.type]);
+
+  const HAND_SLOTS = HAND_ROWS * QUEUE_COLS;
+  const displayHandSlots = animSlots ? animSlots.slice(0, HAND_SLOTS) : handSlots;
+  const transitioning = animSlots ? (animSlots.slice(HAND_SLOTS).filter((id): id is string => id != null)) : [];
+  const displayDeck = transitioning.length > 0 ? [...transitioning, ...drawPile] : drawPile;
+
+  const snakeHand = getSnakeHandSlots(displayHandSlots);
+  const snakeDeck = getSnakeDeckItems(displayDeck);
+
   return (
-    <div class="mx-auto w-full max-w-[600px] p-4 grid grid-cols-6 grid-rows-6 sm:grid-rows-5 gap-2">
-      <div class="grid grid-cols-subgrid [grid-column:2/6] grid-rows-subgrid [grid-row:1/5]">
-        {handSlots.map((tileId, i) => (
-          <HandSlot key={i}>
-            {tileId != null && (
-              <SortableTile
-                key={tileId}
-                id={tileId}
-                {...getTileAnim(phase, tileId, i)}
-                onClick={() => handToFirstField(tileId, i)}
-              />
-            )}
-          </HandSlot>
-        ))}
+    <div class="flex-1 min-h-0 flex flex-col">
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <div class="mx-auto max-w-[400px] p-4 grid grid-cols-4 gap-2">
+          {snakeHand.map(({ tileId, slotIndex }) => (
+            <div key={slotIndex} class={SLOT_CLASS}>
+              {tileId != null && (
+                <div
+                  class="h-full"
+                  ref={(el) => { if (el) tileRefs.current.set(tileId, el); else tileRefs.current.delete(tileId); }}
+                >
+                  <SortableTile
+                    key={tileId}
+                    id={tileId}
+                    {...getTileAnim(phase, tileId, slotIndex)}
+                    onClick={() => handToFirstField(tileId, slotIndex)}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+          {displayDeck.length > 0 && (
+            <div class="col-span-4 flex items-center gap-3 text-xs text-stone-400">
+              <div class="flex-1 border-t border-stone-300" />
+              <span>Up next</span>
+              <div class="flex-1 border-t border-stone-300" />
+            </div>
+          )}
+          {snakeDeck.map(({ tileId, queuePos }) => (
+            <div
+              key={queuePos}
+              class="aspect-square opacity-40"
+              ref={(el) => { if (el && tileId != null) tileRefs.current.set(tileId, el); else if (tileId != null) tileRefs.current.delete(tileId); }}
+            >
+              {tileId != null && <Tile letter={getTile(deck, tileId)[0]} />}
+            </div>
+          ))}
+        </div>
       </div>
-      <div class="grid grid-cols-subgrid [grid-column:1/7] grid-rows-subgrid [grid-row:5/7]">
+      <div class="mx-auto w-full max-w-[400px] p-4 flex gap-2">
         <button
-          class={`${BUTTON_CLASS} ${SECONDARY} [grid-column:2/span_2] [grid-row-start:2] sm:([grid-column:initial] [grid-row:initial])`}
+          class={`flex-1 ${BUTTON_CLASS} ${SECONDARY}`}
           disabled={disabled}
           onClick={onShuffle}
         >
-          <div>Shuffle</div>
+          Shuffle
         </button>
         <button
-          class={`${BUTTON_CLASS} ${PRIMARY} [grid-column:2/span_2]`}
+          class={`flex-1 ${BUTTON_CLASS} ${PRIMARY}`}
           disabled={disabled || discardsLeft === 0}
           onClick={onDiscard}
         >
-          <div>Discard</div>
+          Discard
         </button>
-        <button
-          class={`${BUTTON_CLASS} ${PRIMARY} [grid-column:span_2]`}
-          disabled={disabled}
-          onClick={onPlay}
-        >
-          <div>Play</div>
+        <button class={`flex-1 ${BUTTON_CLASS} ${PRIMARY}`} disabled={disabled} onClick={onPlay}>
+          Play
         </button>
-        <DeckDialog />
       </div>
     </div>
   );

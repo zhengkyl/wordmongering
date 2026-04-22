@@ -6,6 +6,7 @@
 
 - dispute button
 - what if no valid word? what if no valid play after shuffling?
+- share discard and played word animation?
 
 ## Attribution
 

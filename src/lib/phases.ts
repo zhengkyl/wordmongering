@@ -10,7 +10,7 @@ export type ActivePhase =
       runningTotal: number;
     }
   | { type: "discarding"; tileIds: string[] }
-  | { type: "drawing"; newTileIds: Set<string> };
+  | { type: "drawing" };
 
 export const IDLE: ActivePhase = { type: "idle" };
 
@@ -22,7 +22,6 @@ export const SCORING = {
   POWERUP_DISPLAY: 500,
 } as const;
 export const DISCARD = { FALL_ANIM: 400 } as const;
-export const DRAW = { STAGGER: 30, ANIM: 400 } as const;
 
 /** Returns animation props to spread onto a tile element. Empty object = no animation. */
 export function getTileAnim(
@@ -36,9 +35,6 @@ export function getTileAnim(
   }
   if (phase.type === "discarding" && phase.tileIds.includes(tileId)) {
     return { anim: "fall" };
-  }
-  if (phase.type === "drawing" && phase.newTileIds.has(tileId)) {
-    return { anim: "drop-in", animDelay: `${slotIndex * DRAW.STAGGER}ms` };
   }
   return {};
 }
