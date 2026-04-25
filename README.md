@@ -1,12 +1,15 @@
 # Wordmongering
 
-> Balatro for wordcels
-
 ## TODOs
 
 - dispute button
-- what if no valid word? what if no valid play after shuffling?
-- share discard and played word animation?
+
+## ideas
+
+- snake
+- spiral
+- cerberus
+- hydra
 
 ## Attribution
 

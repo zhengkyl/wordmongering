@@ -11,3 +11,7 @@
 - Only keep props whose VALUES genuinely vary per call site (e.g. `id` per tile, `onClick` where parent knows field-vs-hand behavior, `anim`/`animDelay` where parent has slotIndex)
 - Props derivable from context + `id` (like `letter` from `getTile(deck, id)`) must not be passed as props
 - Always fix the root issue, do not go for quick wins
+
+- Do not run build or type checking commands. The user has a dev server running and can check manually.
+
+- The user may make changes to the code as you work. If the change is not simple formatting, assume it is an intentional change by the user.

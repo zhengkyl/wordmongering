@@ -1,66 +1,64 @@
-import { PointerActivationConstraints, PointerSensor } from "@dnd-kit/dom";
-import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from "@dnd-kit/react";
-import {
-  useEffect,
-  useLayoutEffect,
-  useReducer,
-  useRef,
-  useState,
-  type Dispatch,
-  type MutableRefObject,
-  type ReactNode,
-} from "react";
-import { GameProvider, useGame } from "./components/GameContext";
-import { usePhaseRunner, type PhaseRunner } from "./hooks/usePhaseRunner";
-import { getCollapsedField, useSlots } from "./hooks/useSlots";
-import { ALPHABET, type Deck } from "./lib/constants";
-import { findBestPlays, RULES, validateWord } from "./lib/game";
-import {
-  createInitialState,
-  gameReducer,
-  getTile,
-  tileLetters,
-  type GameAction,
-  type GameState,
-  type PlayResult,
-} from "./lib/gameState";
-import { DISCARD, getTileAnim, IDLE, SCORING, type ActivePhase } from "./lib/phases";
-import { POWER_UPS, type PowerUpDef, type PowerUpId } from "./lib/powerups";
-import { Earnings } from "./screens/Earnings";
-import { EndScreen } from "./screens/EndScreen";
-import { Shop } from "./screens/Shop";
+import { useEffect, useRef, useState } from "react";
 
-// Only imported in dev — Rollup tree-shakes this out of production builds
-// since it's only referenced inside `import.meta.env.DEV && ...`
-import { DevMenu } from "./dev/DevMenu";
+const alphabet = "abcdefghijklmnopqrstuvwxyz";
 
-// --- Run-level types ---
+type EnemyTile = { id: number; letter: string };
 
-export type RoundResult = { round: number; score: number; playsUsed: number; discardsUsed: number };
-export type RunStats = { rounds: RoundResult[] };
+const POP_DURATION = 350;
+const STEP_MS = 150;
 
-type AppScreen =
-  | { type: "playing" }
-  | { type: "earnings" }
-  | { type: "shop" }
-  | { type: "end"; won: boolean };
+// ── Shape system ────────────────────────────────────────────────────────────
+
+type ShapeStep = { dx: number; dy: number };
+type ShapeFunc = (index: number, total: number) => ShapeStep;
+
+const TILE_PX = 48;
+const SNAKE_COLS = 4;
+const H_STEP = 52; // tile + 4px gap
+const V_STEP = 68; // tile + 16px gap
+const WAVE = 8;
+
+const snakeShape: ShapeFunc = (index, _total) => {
+  if (index === 0) return { dx: 0, dy: 0 };
+  const colInRow = index % SNAKE_COLS;
+  const row = Math.floor(index / SNAKE_COLS);
+  const dir = row % 2 === 0 ? 1 : -1;
+  if (colInRow === 0) return { dx: 0, dy: V_STEP - 2 * WAVE };
+  const wave = colInRow === 1 || colInRow === SNAKE_COLS - 1 ? WAVE : 0;
+  return { dx: dir * H_STEP, dy: wave };
+};
+
+const activeShape: ShapeFunc = snakeShape;
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export function App() {
-  const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState);
-
-  const { phase, setPhase, isActiveRef, enter, after, exit } = usePhaseRunner<ActivePhase>(IDLE);
-  const slots = useSlots();
-
-  // --- Screen routing ---
-  const [screen, setScreen] = useState<AppScreen>({ type: "playing" });
-  const [round, setRound] = useState(1);
-  const [runStats, setRunStats] = useState<RunStats>({ rounds: [] });
-  const [inventory, setInventory] = useState<PowerUpId[]>([]);
-  const [pennies, setPennies] = useState(0);
-
-  // --- Dictionary ---
   const dictionaryRef = useRef<Set<string> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const tileRefs = useRef<Map<number, HTMLElement>>(new Map());
+  const tileRefCallbacks = useRef<Map<number, (el: HTMLElement | null) => void>>(new Map());
+
+  function getTileRef(id: number) {
+    let cb = tileRefCallbacks.current.get(id);
+    if (!cb) {
+      cb = (el) => {
+        if (el) tileRefs.current.set(id, el);
+        else tileRefs.current.delete(id);
+      };
+      tileRefCallbacks.current.set(id, cb);
+    }
+    return cb;
+  }
   const [dictLoaded, setDictLoaded] = useState(false);
+
+  const [enemy, setEnemy] = useState<EnemyTile[]>(
+    (alphabet + alphabet).split("").map((letter, id) => ({ id, letter })),
+  );
+
+  const [input, setInput] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [poppingCount, setPoppingCount] = useState<number | null>(null);
+  const [slideOffset, setSlideOffset] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/dictionary.txt")
@@ -72,819 +70,202 @@ export function App() {
       });
   }, []);
 
-  // --- Hand-change effect: sync slots + trigger drawing phase ---
-  // prevHandRef captures the hand before each dispatch so we can diff for newly drawn tiles.
-  // On first render prevHandRef is empty, so all tiles are treated as new and animate in.
-  const prevHandRef = useRef<string[]>([]);
+  const isAnimating = poppingCount !== null || slideOffset !== null;
+  const { green: greenTiles, candidate: candidateTiles } = computeGreenTiles(enemy, input);
 
-  useLayoutEffect(() => {
-    const prevHand = prevHandRef.current;
-    const prevHandSet = new Set(prevHand);
-    const newTileIds = new Set(state.hand.filter((id) => !prevHandSet.has(id)));
-    prevHandRef.current = state.hand;
-    slots.reset(state.hand);
+  const renderCount = enemy.length + (slideOffset ?? 0);
+  const positions: { x: number; y: number }[] = Array(renderCount);
+  let cx = 0,
+    cy = 0;
+  for (let i = 0; i < renderCount; i++) {
+    const { dx, dy } = activeShape(i, renderCount);
+    cx += dx;
+    cy += dy;
+    positions[i] = { x: cx, y: cy };
+  }
+  const containerW = Math.max(0, ...positions.map((p) => p.x)) + TILE_PX;
+  const containerH = Math.max(0, ...positions.map((p) => p.y)) + TILE_PX;
 
-    if (newTileIds.size > 0 && prevHand.length > 0) {
-      enter({ type: "drawing" });
-      after(newTileIds.size * 222 + 200, exit);
-    } else {
-      exit();
+  function triggerError(msg: string) {
+    setErrorMsg(msg);
+
+    // NOTE: needs to happen after errorMsg rerender
+    // otherwise desynced class is removed
+    setTimeout(() => {
+      const el = inputRef.current!;
+      el.classList.remove("shake");
+      void el.offsetWidth;
+      el.classList.add("shake");
+    }, 0);
+  }
+
+  function handleSubmit() {
+    if (!dictLoaded || isAnimating) return;
+    if (greenTiles.size === 0) {
+      triggerError("No matching letters");
+      return;
     }
-  }, [state.hand]);
-
-  // --- Screen transition effect ---
-  // Fires after animations complete (phase idle) to advance to shop or end screen.
-  useEffect(() => {
-    if (screen.type !== "playing") return;
-    if (phase.type !== "idle") return;
-    if (state.gamePhase === "round_complete") {
-      const result = {
-        round,
-        score: state.score,
-        playsUsed: RULES.playsLimit - state.playsLeft,
-        discardsUsed: RULES.discardsLimit - state.discardsLeft,
-      };
-      const newStats = { rounds: [...runStats.rounds, result] };
-      setRunStats(newStats);
-      setPennies((prev) => prev + 10 + 2 * state.playsLeft + state.discardsLeft);
-      if (round >= RULES.rounds) {
-        setScreen({ type: "end", won: true });
-      } else {
-        setScreen({ type: "earnings" });
-      }
-    } else if (state.gamePhase === "lost") {
-      const result = {
-        round,
-        score: state.score,
-        playsUsed: RULES.playsLimit - state.playsLeft,
-        discardsUsed: RULES.discardsLimit - state.discardsLeft,
-      };
-      const newStats = { rounds: [...runStats.rounds, result] };
-      setRunStats(newStats);
-      setScreen({ type: "end", won: false });
-    }
-  }, [phase.type, state.gamePhase]);
-
-  // --- Run handlers ---
-
-  const handleContinueToShop = () => setScreen({ type: "shop" });
-
-  const handleNextRound = (acquired: PowerUpId | null, penniesSpent: number) => {
-    if (acquired != null) setInventory((prev) => [...prev, acquired]);
-    setPennies((prev) => prev - penniesSpent);
-    prevHandRef.current = [];
-    slots.clearSlots();
-    dispatch({ type: "RESET" });
-    setRound((r) => r + 1);
-    setScreen({ type: "playing" });
-  };
-
-  const handlePlayAgain = () => {
-    prevHandRef.current = [];
-    slots.clearSlots();
-    dispatch({ type: "RESET" });
-    setRound(1);
-    setRunStats({ rounds: [] });
-    setPennies(0);
-    setScreen({ type: "playing" });
-  };
-
-  return (
-    <div class="h-dvh relative">
-      {screen.type === "playing" && (
-        <PlayingScreen
-          gameState={state}
-          dispatch={dispatch}
-          runner={{ phase, setPhase, isActiveRef, enter, after, exit }}
-          slots={slots}
-          prevHandRef={prevHandRef}
-          dictionaryRef={dictionaryRef}
-          dictLoaded={dictLoaded}
-          round={round}
-          inventory={inventory}
-        />
-      )}
-      {screen.type === "earnings" && (
-        <Earnings
-          round={round}
-          stats={runStats}
-          pennies={pennies}
-          onContinue={handleContinueToShop}
-        />
-      )}
-      {screen.type === "shop" && <Shop pennies={pennies} onNextRound={handleNextRound} />}
-      {screen.type === "end" && (
-        <EndScreen won={screen.won} stats={runStats} onPlayAgain={handlePlayAgain} />
-      )}
-      {import.meta.env.DEV && (
-        <DevMenu
-          dispatch={dispatch as any}
-          gameState={state}
-          enter={enter}
-          exit={exit}
-          onShuffle={slots.shuffleHand}
-        />
-      )}
-    </div>
-  );
-}
-
-// --- Playing screen ---
-
-type PlayingScreenProps = {
-  gameState: GameState;
-  dispatch: Dispatch<GameAction>;
-  runner: PhaseRunner<ActivePhase>;
-  slots: ReturnType<typeof useSlots>;
-  prevHandRef: MutableRefObject<string[]>;
-  dictionaryRef: MutableRefObject<Set<string> | null>;
-  dictLoaded: boolean;
-  round: number;
-  inventory: PowerUpId[];
-};
-
-function PlayingScreen({
-  gameState,
-  dispatch,
-  runner,
-  slots,
-  prevHandRef,
-  dictionaryRef,
-  dictLoaded,
-  round,
-  inventory,
-}: PlayingScreenProps) {
-  const { phase, setPhase, isActiveRef, enter, after } = runner;
-
-  // --- Suggestion state ---
-  const [lastResult, setLastResult] = useState<PlayResult | null>(null);
-  const [currentSuggestions, setCurrentSuggestions] = useState<string[]>([]);
-  const [suggestionIndex, setSuggestionIndex] = useState(0);
-  const [playedHandSuggestions, setPlayedHandSuggestions] = useState<string[]>([]);
-  const [playedBest, setPlayedBest] = useState(false);
-
-  useEffect(() => {
-    if (!dictLoaded) return;
-    setCurrentSuggestions(
-      findBestPlays(tileLetters(gameState.deck, gameState.hand), dictionaryRef.current!),
-    );
-  }, [gameState.hand, dictLoaded]);
-
-  // --- Phase handlers ---
-
-  const startScoringPhase = (tileIds: string[], activePowerUps: PowerUpDef[]) => {
-    const rawTiles = tileIds.map((id) => {
-      const [letter] = getTile(gameState.deck, id);
-      return { letter: letter as string, pts: ALPHABET[letter as keyof typeof ALPHABET].points };
-    });
-
-    // Pre-compute per-tile power-up chains: tilePtsChains[i] = [basePts, afterPu0, afterPu1, ...]
-    const tilePtsChains = rawTiles.map((rawTile, i) => {
-      const chain = [rawTile.pts];
-      for (const pu of activePowerUps) {
-        chain.push(
-          pu.onTile({ letter: rawTile.letter, pts: chain[chain.length - 1] }, i, rawTiles),
-        );
-      }
-      return chain;
-    });
-
-    // Pre-compute onEnd chain
-    const tileTotal = tilePtsChains.reduce((s, chain) => s + chain[chain.length - 1], 0);
-    const scoredTiles = rawTiles.map((t, i) => ({
-      letter: t.letter,
-      pts: tilePtsChains[i][tilePtsChains[i].length - 1],
-    }));
-    const endChain = [tileTotal];
-    for (const pu of activePowerUps)
-      endChain.push(pu.onEnd(endChain[endChain.length - 1], scoredTiles));
-    const finalTotal = endChain[endChain.length - 1];
-
-    const perTileDuration = Math.max(
-      SCORING.TILE_ANIM - SCORING.TILE_OVERLAP,
-      SCORING.PEAK_OFFSET + activePowerUps.length * SCORING.POWERUP_DISPLAY,
-    );
-    const tileAnimDelays = rawTiles.map((_, i) => `${i * perTileDuration}ms`);
-
-    enter({ type: "scoring", tileIds, tileAnimDelays, step: null, runningTotal: 0 });
-
-    rawTiles.forEach((_, i) => {
-      const tileStart = i * perTileDuration;
-
-      after(tileStart + SCORING.PEAK_OFFSET, () =>
-        setPhase((p) =>
-          p.type === "scoring"
-            ? { ...p, step: { tileIndex: i, powerUpIndex: -1, pts: tilePtsChains[i][0] } }
-            : p,
-        ),
-      );
-
-      for (let j = 0; j < activePowerUps.length; j++) {
-        after(tileStart + SCORING.PEAK_OFFSET + (j + 1) * SCORING.POWERUP_DISPLAY, () =>
-          setPhase((p) =>
-            p.type === "scoring"
-              ? { ...p, step: { tileIndex: i, powerUpIndex: j, pts: tilePtsChains[i][j + 1] } }
-              : p,
-          ),
-        );
-      }
-
-      after(tileStart + perTileDuration, () =>
-        setPhase((p) =>
-          p.type === "scoring"
-            ? {
-                ...p,
-                step: null,
-                runningTotal: p.runningTotal + tilePtsChains[i][tilePtsChains[i].length - 1],
-              }
-            : p,
-        ),
-      );
-    });
-
-    const endStart = rawTiles.length * perTileDuration + SCORING.POST_ANIM;
-
-    for (let j = 0; j < activePowerUps.length; j++) {
-      after(endStart + j * SCORING.POWERUP_DISPLAY, () =>
-        setPhase((p) =>
-          p.type === "scoring"
-            ? { ...p, step: { tileIndex: tileIds.length, powerUpIndex: j, pts: endChain[j + 1] } }
-            : p,
-        ),
-      );
-    }
-
-    after(endStart + activePowerUps.length * SCORING.POWERUP_DISPLAY + SCORING.POST_ANIM, () => {
-      prevHandRef.current = gameState.hand;
-      const word = rawTiles.map((t) => t.letter).join("");
-      setLastResult({ valid: true, word, pts: finalTotal });
-      const willContinue =
-        gameState.score + finalTotal < RULES.targetScore && gameState.playsLeft - 1 > 0;
-      snapshotHandSlotsRef.current = slots.handSlots.slice();
-      dispatch({ type: "PLAY", tileIds, pts: finalTotal });
-      if (willContinue) dispatch({ type: "DRAW", count: tileIds.length });
-    });
-  };
-
-  const handleDiscard = () => {
-    const fieldTileIds = slots.fieldSlots.filter((id) => id != null) as string[];
-    setLastResult(null);
-    setPlayedHandSuggestions([]);
-    setPlayedBest(false);
-    if (fieldTileIds.length === 0) return;
-    prevHandRef.current = gameState.hand;
-    enter({ type: "discarding", tileIds: fieldTileIds });
-    after(DISCARD.FALL_ANIM, () => {
-      snapshotHandSlotsRef.current = slots.handSlots.slice();
-      dispatch({ type: "DISCARD", tileIds: fieldTileIds });
-    });
-  };
-
-  const handlePlay = () => {
-    const tileIds = slots.fieldSlots.filter((id) => id != null) as string[];
-    if (tileIds.length === 0) return;
-    const letters = tileLetters(gameState.deck, tileIds);
-    const word = letters.join("");
-    setPlayedBest(currentSuggestions.includes(word));
-    setPlayedHandSuggestions(currentSuggestions);
-    setSuggestionIndex(Math.floor(Math.random() * currentSuggestions.length));
-
-    if (!validateWord(word, dictionaryRef.current!)) {
-      setLastResult({ valid: false, word, pts: 0 });
+    if (!dictionaryRef.current!.has(input.toLowerCase())) {
+      triggerError("Not in dictionary");
       return;
     }
 
-    const activePowerUps = inventory.map((id) => POWER_UPS[id]);
-    startScoringPhase(tileIds, activePowerUps);
-  };
+    const greenCount = greenTiles.size;
+    const nextEnemy = enemy.filter(({ id }) => !greenTiles.has(id));
 
-  // --- Keyboard handler ---
-  const allowedLetters = /^[A-Z]$/;
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (isActiveRef.current) return;
+    setErrorMsg(null);
+    setInput("");
+    setPoppingCount(greenCount);
 
-      const letterKey = e.key.toUpperCase();
-
-      if (allowedLetters.test(letterKey) && !e.ctrlKey && !e.metaKey) {
-        const handIndex = slots.handSlots.findIndex((tileId) => {
-          if (tileId == null) return false;
-          const [letter] = getTile(gameState.deck, tileId);
-          return letter === letterKey;
-        });
-        if (handIndex === -1) return;
-        slots.handToLastField(slots.handSlots[handIndex]!, handIndex);
-        e.preventDefault();
-        return;
+    setTimeout(() => {
+      setPoppingCount(null);
+      setEnemy(nextEnemy);
+      setSlideOffset(greenCount);
+      for (let step = 1; step <= greenCount; step++) {
+        setTimeout(() => setSlideOffset(greenCount - step), STEP_MS * step);
       }
-
-      switch (e.key) {
-        case "Enter": {
-          handlePlay();
-          break;
-        }
-        case "Backspace": {
-          if (e.ctrlKey) {
-            slots.clearField();
-          } else {
-            for (let i = slots.fieldSlots.length - 1; i >= 0; i--) {
-              if (slots.fieldSlots[i] != null) {
-                slots.fieldToHand(slots.fieldSlots[i]!, i);
-                break;
-              }
-            }
-          }
-          break;
-        }
-        default:
-          return;
-      }
-
-      e.preventDefault();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [slots.handSlots]);
-
-  const snapshotHandSlotsRef = useRef<(string | null)[]>([]);
-
-  const dragStartTime = useRef(0);
-  const [shouldAnimateOverlay, setShouldAnimateOverlay] = useState(false);
+      setTimeout(() => setSlideOffset(null), STEP_MS * (greenCount + 1));
+    }, POP_DURATION);
+  }
 
   return (
-    <div class="h-full flex flex-col">
-      <ScoreBar
-        score={gameState.score}
-        playsLeft={gameState.playsLeft}
-        discardsLeft={gameState.discardsLeft}
-        round={round}
-      />
-      <ResultBanner
-        phase={phase}
-        lastResult={lastResult}
-        playedBest={playedBest}
-        playedHandSuggestions={playedHandSuggestions}
-        suggestionIndex={suggestionIndex}
-      />
-      <div class="flex-1 min-h-0">
-        <DragDropProvider
-          sensors={(defaults) => [
-            ...defaults,
-            PointerSensor.configure({
-              activationConstraints(event, _source) {
-                const { pointerType, target: _ } = event;
-
-                switch (pointerType) {
-                  case "mouse":
-                    return [new PointerActivationConstraints.Distance({ value: 10 })];
-                  case "touch":
-                    return [new PointerActivationConstraints.Delay({ value: 250, tolerance: 5 })];
-                  default:
-                    return [
-                      new PointerActivationConstraints.Delay({ value: 200, tolerance: 10 }),
-                      new PointerActivationConstraints.Distance({ value: 5 }),
-                    ];
-                }
-              },
-            }),
-          ]}
-          onDragStart={() => (dragStartTime.current = performance.now())}
-          onDragEnd={(event) => {
-            if (event.canceled) return;
-            if (isActiveRef.current) return;
-
-            const { operation } = event;
-
-            const tileId = operation.source!.id as string;
-            const fieldIndex = slots.fieldSlots.findIndex((id) => id === tileId);
-            const from = fieldIndex === -1 ? "hand" : "field";
-
-            const isBuggedDrag = operation.transform.x === 0 && operation.transform.y === 0;
-            if (isBuggedDrag && (operation.activatorEvent as any).pointerType !== "mouse") {
-              return;
-            }
-
-            if (isBuggedDrag || performance.now() - dragStartTime.current < 50) {
-              setShouldAnimateOverlay(false);
-              if (from === "field") {
-                slots.fieldToHand(tileId, fieldIndex);
-              } else {
-                const handIndex = slots.handSlots.findIndex((id) => id === tileId);
-                slots.handToFirstField(tileId, handIndex);
-              }
-              return;
-            }
-
-            if (!operation.target) {
-              if (from === "field") {
-                setShouldAnimateOverlay(false);
-                slots.fieldToHand(tileId, fieldIndex);
-              }
-              return;
-            }
-
-            setShouldAnimateOverlay(true);
-
-            const toIndex = parseInt((operation.target.id as string).split("_")[1]);
-
-            if (from === "field") {
-              slots.setFieldSlots((prev) => {
-                const next = prev.slice();
-                next[fieldIndex] = null;
-                next[toIndex] = tileId;
-                return getCollapsedField(next, fieldIndex);
-              });
-            } else {
-              const handIndex = slots.handSlots.findIndex((id) => id === tileId);
-              slots.setHandSlots((prev) => prev.map((id, i) => (i === handIndex ? null : id)));
-              slots.setFieldSlots((prev) => prev.map((id, i) => (i === toIndex ? tileId : id)));
-            }
-          }}
-        >
-          <div class="h-full flex flex-col">
-            <GameProvider
-              deck={gameState.deck}
-              phase={phase}
-              drawPile={gameState.drawPile}
-              fieldSlots={slots.fieldSlots}
-              handSlots={slots.handSlots}
-              fieldToHand={slots.fieldToHand}
-              handToFirstField={slots.handToFirstField}
-              handToLastField={slots.handToLastField}
-              disabled={phase.type !== "idle"}
-              discardsLeft={gameState.discardsLeft}
-              onShuffle={slots.shuffleHand}
-              onDiscard={handleDiscard}
-              onPlay={handlePlay}
-              snapshotHandSlotsRef={snapshotHandSlotsRef}
-            >
-              <FieldGrid />
-              <HandGrid />
-            </GameProvider>
-          </div>
-          {/* TODO dragoverlay only renders one things at a time, so "drops" while still animating are not animated */}
-          <DragOverlay dropAnimation={shouldAnimateOverlay ? undefined : null}>
-            {(source) => {
-              const [letter] = getTile(gameState.deck, source.id as string);
-              return <Tile letter={letter} />;
-            }}
-          </DragOverlay>
-        </DragDropProvider>
+    <div>
+      <div class="flex gap-2 p-2">
+        <div class="font-semibold">WORDMONGERING</div>
       </div>
-    </div>
-  );
-}
+      <div class="relative max-w-screen-sm m-auto pb-48">
+        <div class="text-center p-4">Type a word containing this letter</div>
+        <div class="relative m-auto" style={{ width: containerW, height: containerH }}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 31.5 62.2"
+            class="absolute top-0 left-0 w-24px"
+            style={{ transform: `translate(${positions[0].x - 32}px, ${positions[0].y - 18}px)` }}
+          >
+            <g fill="none" stroke="#000" stroke-linecap="round" stroke-width="4">
+              <path d="M21 42.7c.6 3.4 3.3 6 5.5 8.5.8 1 2.7 1.9 2.9 3-1 1.5-3 1.2-4.3 2.1-3.3 1.3-6.5 3-10 4" />
+              <path d="M8.3 1.9c-1.8 4.6-2.8 9.6-4.1 14.4a72 72 0 0 0-2 20.5c0 3 .4 6.1 2.3 8.6 2 2.8 5 4.8 8.2 5.7 3.8 1.4 6.2 2 13.8 2.7" />
+            </g>
+          </svg>
 
-// --- Shared slot/tile primitives ---
-
-const SLOT_CLASS =
-  "flex-1 aspect-square rounded-lg border transition-shadow ease-out bg-stone-200 data-[drop-target=true]:(ring ring-4 ring-blue-500 shadow-xl shadow-inset)";
-
-function FieldSlot({
-  id,
-  disabled,
-  children,
-}: {
-  id: string;
-  disabled?: boolean;
-  children?: ReactNode;
-}) {
-  const droppable = useDroppable({ id, disabled });
-  return (
-    <div ref={droppable.ref} class={SLOT_CLASS} data-drop-target={droppable.isDropTarget}>
-      {children}
-    </div>
-  );
-}
-
-const TILE_CLASS =
-  "[container-type:inline-size] font-mono h-full rounded-lg border font-bold text-stone-800 text-3xl sm:(text-6xl) flex justify-center items-center bg-neutral-50 select-none touch-none";
-
-function SortableTile({
-  id,
-  anim,
-  animDelay,
-  onClick,
-}: {
-  id: string;
-  anim?: string;
-  animDelay?: string;
-  onClick?: () => void;
-}) {
-  const { deck } = useGame();
-  const [letter] = getTile(deck, id);
-  const { ref, isDragging, isDropping } = useDraggable({ id, disabled: anim != null });
-  return (
-    <div
-      ref={ref}
-      class={TILE_CLASS}
-      data-anim={anim}
-      style={{ opacity: isDragging || isDropping ? 0 : undefined, animationDelay: animDelay }}
-      onClick={onClick}
-    >
-      <span class="[font-size:60cqw]">{letter}</span>
-    </div>
-  );
-}
-
-function Tile({ letter }: { letter: keyof Deck }) {
-  return <div class={TILE_CLASS}>{letter}</div>;
-}
-
-const BUTTON_CLASS =
-  "rounded-lg border-2 font-semibold transition-colors disabled:(opacity-50 cursor-not-allowed)";
-const PRIMARY = "border-stone-800 bg-stone-800 text-white @hover:bg-stone-700";
-const SECONDARY = "border-stone-300 bg-white text-stone-600 @hover:bg-stone-50";
-
-// --- Extracted components ---
-
-function ScoreBar({
-  score,
-  playsLeft,
-  discardsLeft,
-  round,
-}: {
-  score: number;
-  playsLeft: number;
-  discardsLeft: number;
-  round: number;
-}) {
-  return (
-    <div
-      data-anim="scorebar-intro"
-      class="bg-stone-100 relative before:(content-[''] absolute inset-0 bg-rose-300 w-[var(--p)] transition-[width] duration-700)"
-      style={{ "--p": `${Math.min((score / RULES.targetScore) * 100, 100)}%` } as any}
-    >
-      <div class="relative h-10 flex items-center justify-center gap-8 px-4 font-bold">
-        <span>
-          Round {round} / {RULES.rounds}
-        </span>
-        <span>
-          Score: {score} / {RULES.targetScore}
-        </span>
-        <span>Plays left: {playsLeft}</span>
-        <span>Discards left: {discardsLeft}</span>
-      </div>
-    </div>
-  );
-}
-
-function ResultBanner({
-  phase,
-  lastResult,
-  playedBest,
-  playedHandSuggestions,
-  suggestionIndex,
-}: {
-  phase: ActivePhase;
-  lastResult: PlayResult | null;
-  playedBest: boolean;
-  playedHandSuggestions: string[];
-  suggestionIndex: number;
-}) {
-  return (
-    <div class="h-12 flex flex-col items-center justify-center font-semibold gap-1">
-      {
-        phase.type === "scoring" ? (
-          <span class="text-green-600">
-            {phase.runningTotal > 0 ? `+${phase.runningTotal}` : ""}
-            {phase.step != null
-              ? phase.step.tileIndex < phase.tileIds.length
-                ? ` [+${phase.step.pts}]`
-                : ` [end: +${phase.step.pts - phase.runningTotal}]`
-              : ""}
-          </span>
-        ) : phase.type === "idle" ? (
-          <>
-            {lastResult && (
-              <span
-                class={
-                  lastResult.valid
-                    ? playedBest
-                      ? "text-yellow-500"
-                      : "text-green-600"
-                    : "text-red-600"
-                }
+          {enemy.map(({ id, letter }, index) => {
+            const { x, y } = positions[index + (slideOffset ?? 0)];
+            const isPopping = poppingCount !== null && index < poppingCount;
+            return (
+              <div
+                key={id}
+                ref={getTileRef(id)}
+                style={{
+                  "--border-src": "var(--border1)",
+                  transform: `translate(${x}px, ${y}px)`,
+                  ...(slideOffset !== null && { transition: `transform ${STEP_MS}ms linear` }),
+                }}
+                class={cl([
+                  "sketchy absolute top-0 left-0 w-12 h-12 flex justify-center items-center font-bold text-2xl uppercase select-none shadow-sm transition-colors",
+                  isPopping && "pop-out",
+                  greenTiles.has(id)
+                    ? "bg-green-200"
+                    : candidateTiles.has(id)
+                      ? "bg-orange-100 contrast-60"
+                      : "bg-orange-100 contrast-40",
+                ])}
               >
-                {lastResult.valid
-                  ? `${lastResult.word} +${lastResult.pts} pts${playedBest ? " — best play!" : ""}`
-                  : `${lastResult.word} — not a word`}
-              </span>
-            )}
-            {playedHandSuggestions[0] && lastResult != null && lastResult.valid && !playedBest && (
-              <span class="text-stone-400 text-sm font-normal">
-                Could have played: {playedHandSuggestions[suggestionIndex]}
-              </span>
-            )}
-          </>
-        ) : null /* discarding, drawing, future phases: silent */
-      }
-    </div>
-  );
-}
-
-const QUEUE_COLS = 4;
-const HAND_ROWS = RULES.handSize / QUEUE_COLS;
-const HAND_SLOTS = HAND_ROWS * QUEUE_COLS;
-
-function snakeIndex(row: number, col: number): number {
-  return row % 2 === 0 ? row * QUEUE_COLS + col : row * QUEUE_COLS + (QUEUE_COLS - 1 - col);
-}
-
-function getSnakeHandSlots(handSlots: (string | null)[]) {
-  const result: { tileId: string | null; slotIndex: number }[] = [];
-  for (let r = 0; r < HAND_ROWS; r++) {
-    for (let c = 0; c < QUEUE_COLS; c++) {
-      const slotIndex = snakeIndex(r, c);
-      result.push({ tileId: handSlots[slotIndex], slotIndex });
-    }
-  }
-  return result;
-}
-
-function getSnakeDeckItems(drawPile: string[]) {
-  const rows = Math.ceil(drawPile.length / QUEUE_COLS);
-  const result: (string | null)[] = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < QUEUE_COLS; c++) {
-      const idx = snakeIndex(r, c);
-      result.push(idx < drawPile.length ? drawPile[idx] : null);
-    }
-  }
-  return result;
-}
-
-function FieldGrid() {
-  const { fieldSlots, fieldToHand, phase } = useGame();
-  return (
-    <div class="mx-auto w-full max-w-[calc(600px+(600px-2rem+0.5rem)/3)] p-4 grid grid-cols-8 gap-2 max-w-[calc(600px+(600px+1rem)/4)]) content-center">
-      {fieldSlots.map((tileId, i) => (
-        <FieldSlot key={i} id={`field_${i}`} disabled={tileId != null}>
-          {tileId != null && (
-            <SortableTile
-              key={tileId}
-              id={tileId}
-              {...getTileAnim(phase, tileId, i)}
-              onClick={() => fieldToHand(tileId, i)}
+                {letter}
+              </div>
+            );
+          })}
+        </div>
+        <div class="sketchy-lg fixed bottom-0 w-full m-auto max-w-screen-sm z-10 p-2 flex flex-col gap-2 bg-background">
+          <div class="flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onInput={(e) => {
+                setInput((e.target as HTMLInputElement).value);
+                setErrorMsg(null);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              class={cl([
+                "sketchy-lg w-full px-3 py-2 font-bold uppercase tracking-widest transition-colors outline-none bg-orange-100",
+                errorMsg && "border-red-500 outline-red-500",
+              ])}
+              placeholder="type a word..."
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck={false}
             />
-          )}
-        </FieldSlot>
-      ))}
-    </div>
-  );
-}
-
-function HandGrid() {
-  const {
-    deck,
-    handSlots,
-    drawPile,
-    handToFirstField,
-    phase,
-    disabled,
-    discardsLeft,
-    onShuffle,
-    onDiscard,
-    onPlay,
-    snapshotHandSlotsRef,
-  } = useGame();
-
-  const [animSlots, setAnimSlots] = useState<(string | null)[] | null>(null);
-  const tileRefs = useRef<Map<string, HTMLElement>>(new Map());
-  const beforePosRef = useRef<Map<string, { x: number; y: number }>>(new Map());
-
-  // FLIP: fires after every render; animates tiles from snapshotted positions to their new positions
-  useLayoutEffect(() => {
-    for (const [id, el] of tileRefs.current) {
-      const before = beforePosRef.current.get(id);
-      if (!before) continue;
-      const r = el.getBoundingClientRect();
-      const dx = before.x - r.left;
-      const dy = before.y - r.top;
-      if (Math.abs(dx) + Math.abs(dy) < 1) continue;
-      for (const a of el.getAnimations()) a.cancel();
-      el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], {
-        duration: 150,
-        easing: "ease-out",
-      });
-    }
-    beforePosRef.current = new Map();
-  });
-
-  useLayoutEffect(() => {
-    if (phase.type !== "drawing") {
-      setAnimSlots(null);
-      return;
-    }
-
-    const snapshotHand = snapshotHandSlotsRef.current;
-    const drawnTiles = handSlots.filter(
-      (id): id is string => id != null && !snapshotHand.includes(id),
-    );
-    let current: (string | null)[] = [...snapshotHand, ...drawnTiles];
-    setAnimSlots(current);
-
-    const intervalId = setInterval(() => {
-      // Snapshot positions before update so FLIP effect can animate from old to new
-      const snap = new Map<string, { x: number; y: number }>();
-      for (const [id, el] of tileRefs.current) {
-        const r = el.getBoundingClientRect();
-        snap.set(id, { x: r.left, y: r.top });
-      }
-      beforePosRef.current = snap;
-
-      let rightmostNull = -1;
-      for (let i = current.length - 1; i >= 0; i--) {
-        if (current[i] === null) {
-          rightmostNull = i;
-          break;
-        }
-      }
-      if (rightmostNull === -1) {
-        clearInterval(intervalId);
-        return;
-      }
-      current = current.filter((_, i) => i !== rightmostNull);
-      setAnimSlots(current);
-    }, 222);
-
-    return () => clearInterval(intervalId);
-  }, [phase.type]);
-
-  const displayHandSlots = animSlots ? animSlots.slice(0, HAND_SLOTS) : handSlots;
-  const transitioning = animSlots
-    ? animSlots.slice(HAND_SLOTS).filter((id): id is string => id != null)
-    : [];
-  const displayDeck = transitioning.length > 0 ? [...transitioning, ...drawPile] : drawPile;
-
-  const snakeHand = getSnakeHandSlots(displayHandSlots);
-  const snakeDeck = getSnakeDeckItems(displayDeck);
-
-  return (
-    <div class="flex-1 min-h-0 flex flex-col">
-      <div class="flex-1 min-h-0 overflow-y-auto">
-        <div class="mx-auto max-w-[400px] p-4 grid grid-cols-4 gap-2">
-          {snakeHand.map(({ tileId, slotIndex }) => (
-            <div key={slotIndex} class={SLOT_CLASS}>
-              {tileId != null && (
-                <div
-                  class="h-full"
-                  ref={(el) => {
-                    if (el) tileRefs.current.set(tileId, el);
-                    else tileRefs.current.delete(tileId);
-                  }}
-                >
-                  <SortableTile
-                    key={tileId}
-                    id={tileId}
-                    {...getTileAnim(phase, tileId, slotIndex)}
-                    onClick={() => handToFirstField(tileId, slotIndex)}
-                  />
-                </div>
+            <button
+              class="sketchy-md inline-flex justify-center items-center px-3 bg-blue-500 text-white font-bold"
+              onClick={handleSubmit}
+            >
+              <svg
+                class="w-5 h-5 mr-1"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m11 19-6-6" />
+                <path d="m5 21-2-2" />
+                <path d="m8 16-4 4" />
+                <path d="M9.5 17.5 21 6V3h-3L6.5 14.5" />
+              </svg>
+              Play
+            </button>
+          </div>
+          <div class="flex justify-between">
+            <div
+              class={cl([
+                "flex items-center gap-2 text-sm text-red-600",
+                errorMsg ? "visible" : "",
+              ])}
+            >
+              <span>{errorMsg}</span>
+              {errorMsg === "Not in dictionary" && (
+                <button class="underline text-red-400 hover:text-red-600" onClick={() => {}}>
+                  Report missing
+                </button>
               )}
             </div>
-          ))}
-          {displayDeck.length > 0 && (
-            <div class="col-span-4 flex items-center gap-3 text-xs text-stone-400">
-              <div class="flex-1 border-t border-stone-300" />
-              <span>Up next</span>
-              <div class="flex-1 border-t border-stone-300" />
-            </div>
-          )}
-          {snakeDeck.map((tileId, i) => (
-            <div
-              key={tileId ?? `slot-${i}`}
-              class="aspect-square opacity-40"
-              ref={(el) => {
-                if (tileId == null) return;
-                if (el) tileRefs.current.set(tileId, el);
-                else tileRefs.current.delete(tileId);
-              }}
-            >
-              {tileId != null && <Tile letter={getTile(deck, tileId)[0]} />}
-            </div>
-          ))}
+            <button class="underline border-none">Settings</button>
+          </div>
         </div>
-      </div>
-      <div class="mx-auto w-full max-w-[400px] p-4 flex gap-2">
-        <button
-          class={`flex-1 ${BUTTON_CLASS} ${SECONDARY}`}
-          disabled={disabled}
-          onClick={onShuffle}
-        >
-          Shuffle
-        </button>
-        <button
-          class={`flex-1 ${BUTTON_CLASS} ${PRIMARY}`}
-          disabled={disabled || discardsLeft === 0}
-          onClick={onDiscard}
-        >
-          Discard
-        </button>
-        <button class={`flex-1 ${BUTTON_CLASS} ${PRIMARY}`} disabled={disabled} onClick={onPlay}>
-          Play
-        </button>
       </div>
     </div>
   );
+}
+
+function computeGreenTiles(
+  enemy: EnemyTile[],
+  input: string,
+): { green: Set<number>; candidate: Set<number> } {
+  const counts = new Map<string, number>();
+  for (const c of input.toLowerCase()) {
+    counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+
+  const candidate = new Set<number>();
+  for (const { id, letter } of enemy) {
+    const count = counts.get(letter) ?? 0;
+    if (count > 0) {
+      candidate.add(id);
+      counts.set(letter, count - 1);
+    }
+  }
+
+  const green = new Set<number>();
+  for (const { id } of enemy) {
+    if (!candidate.has(id)) break;
+    green.add(id);
+  }
+
+  return { green, candidate };
+}
+
+function cl(classList: (string | false | 0 | null | undefined)[]) {
+  return classList.filter(Boolean).join(" ");
 }
