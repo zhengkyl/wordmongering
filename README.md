@@ -1,5 +1,7 @@
 # Wordmongering
 
+![game preview](./docs/preview.png)
+
 ## TODOs
 
 - dispute button
