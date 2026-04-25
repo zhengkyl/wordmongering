@@ -1,3 +1,4 @@
+a
 aa
 aah
 aahed
@@ -84499,7 +84500,6 @@ fashionistas
 fashionists
 fashionmonger
 fashionmongers
-fashionmonging
 fashions
 fashiony
 fashious
@@ -84894,6 +84894,9 @@ fearless
 fearlessly
 fearlessness
 fearlessnesses
+fearmonger
+fearmongering
+fearmongers
 fearnaught
 fearnaughts
 fearnought
@@ -113092,6 +113095,7 @@ hystricomorphs
 hyte
 hythe
 hythes
+i
 iamb
 iambi
 iambic
@@ -271817,6 +271821,7 @@ wordlessnesses
 wordlore
 wordlores
 wordmonger
+wordmongering
 wordmongers
 wordplay
 wordplays
