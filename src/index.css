@@ -2,6 +2,15 @@
   isolation: isolate;
 }
 
+dialog {
+  padding: 0;
+  max-width: min(24rem, calc(100% - 2rem));
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
 body {
   /* base-ui for safari 26+ */
   position: relative;

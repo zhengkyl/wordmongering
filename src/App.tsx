@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { X } from "./components/icons/X";
 
 const alphabet = "abcdefghijklmnopqrstuvwxyz";
 
@@ -59,6 +60,19 @@ export function App() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [poppingCount, setPoppingCount] = useState<number | null>(null);
   const [slideOffset, setSlideOffset] = useState<number | null>(null);
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [reportWord, setReportWord] = useState<string | null>(null);
+
+  useEffect(() => {
+    function refocusOnType(e: KeyboardEvent) {
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        inputRef.current!.focus();
+      }
+    }
+    document.addEventListener("keydown", refocusOnType);
+    return () => document.removeEventListener("keydown", refocusOnType);
+  }, []);
 
   useEffect(() => {
     fetch("/dictionary.txt")
@@ -226,15 +240,22 @@ export function App() {
             >
               <span>{errorMsg}</span>
               {errorMsg === "Not in dictionary" && (
-                <button class="underline text-red-400 hover:text-red-600" onClick={() => {}}>
+                <button
+                  class="underline text-red-400 hover:text-red-600"
+                  onClick={() => setReportWord(input)}
+                >
                   Report missing
                 </button>
               )}
             </div>
-            <button class="underline border-none">Settings</button>
+            <button class="underline border-none" onClick={() => setShowSettings(true)}>
+              Settings
+            </button>
           </div>
         </div>
       </div>
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {reportWord !== null && <ReportModal word={reportWord} onClose={() => setReportWord(null)} />}
     </div>
   );
 }
@@ -268,4 +289,91 @@ function computeGreenTiles(
 
 function cl(classList: (string | false | 0 | null | undefined)[]) {
   return classList.filter(Boolean).join(" ");
+}
+
+// ── Modals ───────────────────────────────────────────────────────────────────
+
+function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <dialog
+      ref={(el) => {
+        if (el) el.showModal();
+      }}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      class="bg-transparent"
+    >
+      <div class="sketchy-lg bg-background p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="font-bold text-lg">{title}</h2>
+          <button class="p-1 -mr-1" onClick={onClose}>
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="flex flex-col gap-6">{children}</div>
+      </div>
+    </dialog>
+  );
+}
+
+function SettingsModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="Settings" onClose={onClose}>
+      <p class="text-sm text-gray-500">No settings yet.</p>
+    </Modal>
+  );
+}
+
+function ReportModal({ word, onClose }: { word: string; onClose: () => void }) {
+  const [submitted, setSubmitted] = useState(false);
+  const [note, setNote] = useState("");
+
+  if (submitted) {
+    return (
+      <Modal title="Thanks!" onClose={onClose}>
+        <p>Your report has been submitted!</p>
+        <p>You can expect a reward or a punishment in 2-3 days ;)</p>
+        <button class="sketchy-md px-4 py-2 font-bold w-full" onClick={onClose}>
+          Close
+        </button>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal title="Report Missing Word" onClose={onClose}>
+      <div>
+        <p class="text-xs text-gray-500 mb-1">Word</p>
+        <p class="font-bold uppercase text-2xl">{word}</p>
+      </div>
+      <textarea
+        class="sketchy-lg w-full px-3 py-2 text-sm resize-none bg-orange-100"
+        placeholder="Any context? (optional)"
+        value={note}
+        onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
+        rows={3}
+      />
+      <div class="flex gap-2">
+        <button class="sketchy-md flex-1 px-4 py-2" onClick={onClose}>
+          Cancel
+        </button>
+        <button
+          class="sketchy-md flex-1 px-4 py-2 bg-blue-500 text-white font-bold"
+          onClick={() => setSubmitted(true)}
+        >
+          Submit
+        </button>
+      </div>
+    </Modal>
+  );
 }
