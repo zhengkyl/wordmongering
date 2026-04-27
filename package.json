@@ -1,26 +1,14 @@
 {
   "name": "wordmongering",
-  "version": "0.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "fmt": "oxfmt",
-    "preview": "vite preview",
-    "addword": "f(){ echo \"$1\" | sort -mu - public/dictionary.txt -o public/dictionary.txt; }; f",
-    "addwords": "f(){ sort \"$1\" | sort -mu - public/dictionary.txt -o public/dictionary.txt; }; f"
-  },
-  "dependencies": {
-    "@unocss/reset": "^66.3.3",
-    "preact": "^10.28.4"
+    "dev": "pnpm --filter @wordmongering/client --filter @wordmongering/server dev",
+    "build": "pnpm --filter @wordmongering/client build",
+    "deploy": "docker compose up --build -d",
+    "fmt": "oxfmt"
   },
   "devDependencies": {
-    "@preact/preset-vite": "^2.10.3",
-    "oxfmt": "^0.35.0",
-    "typescript": "~5.8.3",
-    "unocss": "^66.3.3",
-    "vite": "^7.0.4"
+    "oxfmt": "^0.35.0"
   },
   "packageManager": "pnpm@9.15.0+sha512.76e2379760a4328ec4415815bcd6628dee727af3779aaa4c914e3944156c4299921a89f976381ee107d41f12cfa4b66681ca9c718f0668fa0831ed4c6d8ba56c"
 }

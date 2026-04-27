@@ -70,7 +70,7 @@ svg[data-lucide] {
 
 .sketchy {
   border: 8px solid;
-  border-image-source: var(--border-src);
+  border-image-source: var(--border-src, --border1);
   border-image-slice: 20;
 
   border-radius: 0.25rem;
