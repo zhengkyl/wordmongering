@@ -67,8 +67,8 @@ app.post("/api/dailies/:day", sValidator("json", DailySchema), (c) => {
   return c.body(null, 201);
 });
 
-app.use("/*", serveStatic({ root: join(root, "client/dist") }));
-app.get("/*", serveStatic({ path: join(root, "client/dist/index.html") }));
+app.use("/*", serveStatic({ root: join(root, "apps/client/dist") }));
+app.get("/*", serveStatic({ path: join(root, "apps/client/dist/index.html") }));
 
 serve({ fetch: app.fetch, port: 3000 }, () => {
   console.log("Server running at http://localhost:3000");
