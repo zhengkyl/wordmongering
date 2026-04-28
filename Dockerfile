@@ -1,6 +1,6 @@
 FROM node:24-slim AS builder
 WORKDIR /app
-RUN corepack enable pnpm
+RUN corepack enable pnpm && corepack prepare pnpm@9.15.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/client/package.json ./apps/client/
 COPY apps/server/package.json ./apps/server/
@@ -10,7 +10,7 @@ RUN pnpm build
 
 FROM node:24-slim AS runner
 WORKDIR /app
-RUN corepack enable pnpm
+RUN corepack enable pnpm && corepack prepare pnpm@9.15.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/client/package.json ./apps/client/
 COPY apps/server/package.json ./apps/server/
