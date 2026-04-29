@@ -5,7 +5,8 @@
     "dev": "pnpm --filter @wordmongering/client --filter @wordmongering/server dev",
     "build": "pnpm --filter @wordmongering/client build",
     "deploy": "docker compose up --build -d",
-    "fmt": "oxfmt"
+    "fmt": "oxfmt",
+    "db:studio": "pnpm --filter @wordmongering/server db:studio"
   },
   "devDependencies": {
     "oxfmt": "^0.35.0"
