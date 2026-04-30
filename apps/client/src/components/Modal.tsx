@@ -19,7 +19,7 @@ export function Modal({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      class="bg-transparent"
+      class="bg-transparent min-w-sm"
     >
       <div class="sketchy-lg bg-background p-6">
         <div class="flex justify-between items-center mb-4">

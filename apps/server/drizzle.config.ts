@@ -5,4 +5,5 @@ export default defineConfig({
   schema: "./schema.ts",
   out: "./migrations",
   dbCredentials: { url: "../../data/data.db" },
+  casing: "snake_case",
 });

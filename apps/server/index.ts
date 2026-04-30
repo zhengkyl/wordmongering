@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { sValidator } from "@hono/standard-validator";
 import Database from "better-sqlite3";
-import { eq, sql } from "drizzle-orm";
+import { eq, min, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { Hono } from "hono";
@@ -25,17 +25,35 @@ const app = new Hono();
 app.get("/api/dailies/:day/results", (c) => {
   const day = Number(c.req.param("day"));
   const rows = db
-    .select({
-      score: sql<number>`json_array_length(words)`,
-    })
+    .select({ score: sql<number>`json_array_length(words)` })
     .from(dailies)
     .where(eq(dailies.day, day))
     .all();
-  const counts: Record<number, number> = {};
+
+  const allPlays: Record<number, number> = {};
   for (const { score } of rows) {
-    counts[score] = (counts[score] ?? 0) + 1;
+    allPlays[score] = (allPlays[score] ?? 0) + 1;
   }
-  return c.json(counts);
+
+  const firstPlaySubquery = db
+    .select({ id: min(dailies.id).as("first_play_id") })
+    .from(dailies)
+    .where(eq(dailies.day, day))
+    .groupBy(dailies.playerHint)
+    .as("fp");
+
+  const firstPlayRows = db
+    .select({ score: sql<number>`json_array_length(${dailies.words})` })
+    .from(dailies)
+    .innerJoin(firstPlaySubquery, eq(dailies.id, firstPlaySubquery.id))
+    .all();
+
+  const firstPlays: Record<number, number> = {};
+  for (const { score } of firstPlayRows) {
+    firstPlays[score] = (firstPlays[score] ?? 0) + 1;
+  }
+
+  return c.json({ allPlays, firstPlays });
 });
 
 const DailySchema = v.strictObject({

@@ -14,9 +14,9 @@ export const snakeShape: ShapeFunc = (index, _total) => {
   const colInRow = index % SNAKE_COLS;
   const row = Math.floor(index / SNAKE_COLS);
   const dir = row % 2 === 0 ? 1 : -1;
-  if (colInRow === 0) return { dx: 0, dy: V_STEP - 2 * WAVE };
+  if (colInRow === 0) return { dx: 0, dy: -(V_STEP - 2 * WAVE) };
   const wave = colInRow === 1 || colInRow === SNAKE_COLS - 1 ? WAVE : 0;
-  return { dx: dir * H_STEP, dy: wave };
+  return { dx: dir * H_STEP, dy: -wave };
 };
 
 export const activeShape: ShapeFunc = snakeShape;

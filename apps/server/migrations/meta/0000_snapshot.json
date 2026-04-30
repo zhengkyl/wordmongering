@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1fd70c65-8676-4d3f-ba66-2faf0eb444c8",
+  "id": "453c9ce1-665b-408f-a0f2-23694e0db596",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "dailies": {
@@ -14,8 +14,8 @@
           "notNull": true,
           "autoincrement": true
         },
-        "playerHint": {
-          "name": "playerHint",
+        "player_hint": {
+          "name": "player_hint",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -35,8 +35,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -59,8 +59,8 @@
           "notNull": true,
           "autoincrement": true
         },
-        "playerHint": {
-          "name": "playerHint",
+        "player_hint": {
+          "name": "player_hint",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -80,8 +80,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "createdAt": {
-          "name": "createdAt",
+        "created_at": {
+          "name": "created_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
