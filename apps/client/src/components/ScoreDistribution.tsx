@@ -83,8 +83,8 @@ function ScoreChart({ data, playerScore }: ChartProps) {
     const isPlayer = words === playerScore;
     const pct = Math.round((count / maxCount) * 100);
     return (
-      <div key={i} class="flex items-center gap-2 text-sm">
-        <div class="w-4 text-right font-mono text-gray-500">{words}</div>
+      <div key={i} class="flex items-center text-sm">
+        <div class="-ml-4 w-8 pr-2 text-right font-mono text-gray-500">{words}</div>
         <div class="flex-1">
           <div
             class={cl([

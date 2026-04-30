@@ -2,7 +2,7 @@
   "name": "wordmongering",
   "private": true,
   "scripts": {
-    "start": "pnpm --filter @wordmongering/server dev",
+    "dev": "pnpm --filter @wordmongering/client --filter @wordmongering/server dev",
     "build": "pnpm --filter @wordmongering/client build",
     "deploy": "docker compose up --build -d",
     "fmt": "oxfmt",

@@ -69,7 +69,7 @@ const DailySchema = v.strictObject({
 const WM_EPOCH = Date.UTC(2026, 3, 26, 10);
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-app.post("/api/dailies/:day", sValidator("json", DailySchema), (c) => {
+app.post("/api/dailies/:day/results", sValidator("json", DailySchema), (c) => {
   const day = Number(c.req.param("day"));
   const maxDays = Math.ceil((Date.now() - WM_EPOCH) / MS_PER_DAY);
   if (day < 1 || day > maxDays) return c.text("Invalid day", 400);

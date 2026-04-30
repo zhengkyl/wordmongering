@@ -40,6 +40,7 @@ function GameOrResults({ day }: { day: number }) {
         if (plays === 1) {
           fetch(`/api/dailies/${day}/results`, {
             method: "POST",
+            headers: { "Content-Type": "application/json" },
             signal: AbortSignal.timeout(1000),
             body: JSON.stringify({
               playerHint: getPlayerHint(),
