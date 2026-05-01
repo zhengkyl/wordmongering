@@ -6,12 +6,24 @@ import { eq, min, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { Hono } from "hono";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as v from "valibot";
+import { BloomFilter } from "./lib/bloomFilter.ts";
+import { rateLimiter } from "./lib/rateLimiter.ts";
 import { dailies } from "./schema.ts";
 
 const root = join(import.meta.dirname, "../..");
+
+const dictPath =
+  process.env.NODE_ENV === "production"
+    ? join(root, "apps/client/dist/dictionary.txt")
+    : join(root, "apps/client/public/dictionary.txt");
+
+const dictionary = new BloomFilter();
+for (const word of readFileSync(dictPath, "utf8").split("\n")) {
+  if (word) dictionary.add(word);
+}
 
 mkdirSync(join(root, "data"), { recursive: true });
 
@@ -21,6 +33,8 @@ const db = drizzle({ client, casing: "snake_case" });
 migrate(db, { migrationsFolder: join(import.meta.dirname, "migrations") });
 
 const app = new Hono();
+
+app.use("/api", rateLimiter());
 
 app.get("/api/dailies/:day/results", (c) => {
   const day = Number(c.req.param("day"));
@@ -66,12 +80,12 @@ const DailySchema = v.strictObject({
 });
 
 // Earliest Midnight April 27, 2026 UTC+14
-const WM_EPOCH = Date.UTC(2026, 3, 26, 10);
+const WM_GLOBAL_EPOCH = Date.UTC(2026, 3, 26, 10);
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 app.post("/api/dailies/:day/results", sValidator("json", DailySchema), (c) => {
   const day = Number(c.req.param("day"));
-  const maxDays = Math.ceil((Date.now() - WM_EPOCH) / MS_PER_DAY);
+  const maxDays = Math.ceil((Date.now() - WM_GLOBAL_EPOCH) / MS_PER_DAY);
   if (day < 1 || day > maxDays) return c.text("Invalid day", 400);
 
   const { playerHint, words } = c.req.valid("json");
@@ -85,7 +99,11 @@ app.post("/api/dailies/:day/results", sValidator("json", DailySchema), (c) => {
   return c.body(null, 201);
 });
 
+// NOTE TO SELF:
+// nginx serving directly is faster but
+// would require cloudflare specific logic in this repo
 app.use("/*", serveStatic({ root: join(root, "apps/client/dist") }));
+// Fallback for non-matched paths
 app.get("/*", serveStatic({ path: join(root, "apps/client/dist/index.html") }));
 
 serve({ fetch: app.fetch, port: 3000 }, () => {

@@ -18,4 +18,5 @@ RUN pnpm install --frozen-lockfile --prod --filter @wordmongering/server
 COPY apps/server ./apps/server
 COPY --from=builder /app/apps/client/dist ./apps/client/dist
 EXPOSE 3000
+ENV NODE_ENV=production
 CMD ["node", "apps/server/index.ts"]
