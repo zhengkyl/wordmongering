@@ -2,12 +2,11 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { cl } from "../lib/cl";
 import type { EnemyTile } from "../lib/computeGreenTiles";
 import { computeEnemyGreenTiles } from "../lib/computeGreenTiles";
-import { PUZZLES } from "../lib/puzzles";
 import { activeShape, POP_DURATION, STEP_MS, TILE_PX } from "../lib/shapes";
 import { ReportModal } from "./ReportModal";
 
-export function Game({ day, onComplete }: { day: number; onComplete: (words: string[]) => void }) {
-  const puzzleWord = PUZZLES[day];
+export function Game({ day, puzzle, onComplete }: { day: number; puzzle: string; onComplete: (words: string[]) => void }) {
+  const puzzleWord = puzzle;
   const dictionaryRef = useRef<Set<string> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const slideStepsRef = useRef(-1);

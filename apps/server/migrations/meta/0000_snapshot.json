@@ -1,43 +1,22 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "453c9ce1-665b-408f-a0f2-23694e0db596",
+  "id": "071c719b-e237-4966-b221-37b83b96f629",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
-    "dailies": {
-      "name": "dailies",
+    "puzzles": {
+      "name": "puzzles",
       "columns": {
-        "id": {
-          "name": "id",
+        "day": {
+          "name": "day",
           "type": "integer",
           "primaryKey": true,
           "notNull": true,
           "autoincrement": true
         },
-        "player_hint": {
-          "name": "player_hint",
+        "puzzle": {
+          "name": "puzzle",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "day": {
-          "name": "day",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "words": {
-          "name": "words",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -90,6 +69,65 @@
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "results": {
+      "name": "results",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "player_hint": {
+          "name": "player_hint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "day": {
+          "name": "day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "words": {
+          "name": "words",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "results_day_puzzles_day_fk": {
+          "name": "results_day_puzzles_day_fk",
+          "tableFrom": "results",
+          "tableTo": "puzzles",
+          "columnsFrom": [
+            "day"
+          ],
+          "columnsTo": [
+            "day"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

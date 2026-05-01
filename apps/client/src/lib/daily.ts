@@ -4,5 +4,5 @@ export const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export function getDayNumber(): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return Math.round((today.getTime() - LOCAL_WM_EPOCH) / MS_PER_DAY);
+  return Math.round((today.getTime() - LOCAL_WM_EPOCH) / MS_PER_DAY) + 1;
 }

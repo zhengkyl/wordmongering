@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch index.ts",
+    "start": "NODE_ENV=production node index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"

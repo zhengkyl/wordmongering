@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "pnpm --filter @wordmongering/client --filter @wordmongering/server dev",
     "build": "pnpm --filter @wordmongering/client build",
+    "start": "pnpm --filter @wordmongering/server start",
     "deploy": "docker compose up --build -d",
     "fmt": "oxfmt",
     "db:studio": "pnpm --filter @wordmongering/server db:studio"

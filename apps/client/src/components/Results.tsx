@@ -1,18 +1,17 @@
 import { Link } from "wouter-preact";
 import { cl } from "../lib/cl";
 import { wordGreenIndexes } from "../lib/computeGreenTiles";
-import { PUZZLES } from "../lib/puzzles";
 import { getStats, type GameResult } from "../lib/storage";
 import { ScoreDistribution } from "./ScoreDistribution";
 
 interface Props {
   day: number;
+  puzzle: string;
   gameResult: GameResult;
   onPlayAgain: () => void;
 }
 
-export function ResultsPage({ day, gameResult, onPlayAgain }: Props) {
-  const puzzle = PUZZLES[day];
+export function ResultsPage({ day, puzzle, gameResult, onPlayAgain }: Props) {
   const { daysPlayed, currentStreak, bestStreak } = getStats();
 
   let tempPuzzle = puzzle;

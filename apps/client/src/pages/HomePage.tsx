@@ -17,6 +17,9 @@ export function HomePage() {
         <Link href="/daily/tutorial" class="text-center underline text-sm text-gray-500">
           How to Play
         </Link>
+        <Link href="/archive" class="text-center underline text-sm text-gray-500">
+          Archive
+        </Link>
       </div>
     </div>
   );

@@ -1,8 +1,10 @@
-# Personal Setup Guide
+# Personal VPS Setup Guide
 
-This is how I personally setup a DigitalOcean droplet with Ubuntu 24. My domain is on Cloudflare which I'm using heavily. My ssh key was set up beforehand.
+This is how I set up a DigitalOcean droplet with Ubuntu 24. My domain is on Cloudflare which I'm using as a reverse proxy.
 
 ## Update packages
+
+My ssh key was configured beforehand.
 
 ```sh
 ssh root@42.42.42.42
@@ -179,11 +181,14 @@ server {
     location / {
         proxy_pass http://localhost:3000;
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $http_cf_connecting_ip;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
 
-Ask your AI about your specific situation.
+Ask your AI about your specific situation. The rate limiter requires the `X-Real-IP` header I get via CF-Connecting-IP. You might want to use `$remote_addr`. Still not sure about `X-Forwarded-For` and `X-Forwarded-Proto`.
 
 ```sh
 sudo nginx -t # outputs tests is successful
@@ -212,8 +217,9 @@ Building on a cheap droplet is a miserable experience, so I opted to use Github 
 # Add user to docker group to avoid needing sudo on commands
 sudo usermod -aG docker $USER
 
-# Technically all you need is docker-compose.yml and Dockerfile
+# Technically all you need is compose.yml
 git clone git@github.com:zhengkyl/wordmongering.git
+
 cd wordmongering
 
 # get latest image

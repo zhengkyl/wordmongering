@@ -1,9 +1,16 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const dailies = sqliteTable("dailies", {
+export const puzzles = sqliteTable("puzzles", {
+  day: integer().primaryKey({ autoIncrement: true }),
+  puzzle: text().notNull(),
+});
+
+export const results = sqliteTable("results", {
   id: integer().primaryKey({ autoIncrement: true }),
   playerHint: text().notNull(),
-  day: integer().notNull(),
+  day: integer()
+    .notNull()
+    .references(() => puzzles.day),
   words: text().notNull(),
   createdAt: integer({ mode: "timestamp" })
     .notNull()
