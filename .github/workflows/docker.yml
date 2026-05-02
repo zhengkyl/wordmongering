@@ -3,6 +3,13 @@ name: Build and push Docker image
 on:
   push:
     branches: [authoritative]
+    paths:
+      - Dockerfile
+      - apps/client/**
+      - apps/server/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
 
 env:
   REGISTRY: ghcr.io
