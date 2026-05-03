@@ -35,12 +35,11 @@ The server listens at `localhost:3000`. It expects the `X-Real-IP` header for ra
 # Download compose.yaml
 curl -O https://raw.githubusercontent.com/zhengkyl/wordmongering/refs/heads/authoritative/compose.yaml
 
-# Define variables in a .env file (auto loaded by docker compose)
-echo "BLOOM_FILTER_PEPPER=$(openssl rand -base64 32)" > .env
-echo "ADMINISTRATOR_PASSWORD=confidentiality" >> .env
-
-# Rock n roll
+# Start server
 docker compose up -d
+
+# Open admin tui
+docker exec -it <container_id_or_name> /bin/dashboard
 ```
 
 ### Node
@@ -50,13 +49,13 @@ git clone https://github.com/zhengkyl/wordmongering
 
 cd wordmongering
 
-pnpm install
+make install
 
-pnpm run build
+make build
 
-# Set env variables before starting server
-export BLOOM_FILTER_PEPPER="$(openssl rand -base64 32)"
-export ADMINISTRATOR_PASSWORD=confidentiality
+# Start server
+make start
 
-pnpm run start
+# Open admin tui
+make start-dash
 ```

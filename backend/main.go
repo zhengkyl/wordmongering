@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"embed"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
@@ -55,7 +57,13 @@ func run(ctx context.Context) error {
 	}
 	defer db.Close()
 
-	api, err := newApiHandler(db, root, os.Getenv("BLOOM_FILTER_PEPPER"))
+	pepperBytes := make([]byte, 24)
+	_, err = rand.Read(pepperBytes)
+	if err != nil {
+		return err
+	}
+
+	api, err := newApiHandler(db, root, base64.StdEncoding.EncodeToString(pepperBytes))
 	if err != nil {
 		return err
 	}

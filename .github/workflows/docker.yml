@@ -5,11 +5,8 @@ on:
     branches: [authoritative]
     paths:
       - Dockerfile
-      - apps/client/**
-      - apps/server/**
-      - package.json
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
+      - backend/**
+      - client/**
 
 env:
   REGISTRY: ghcr.io
