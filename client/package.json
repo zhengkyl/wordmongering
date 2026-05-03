@@ -5,9 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "addword": "f(){ echo \"$1\" | sort -mu - public/dictionary.txt -o public/dictionary.txt; }; f",
-    "addwords": "f(){ sort \"$1\" | sort -mu - public/dictionary.txt -o public/dictionary.txt; }; f"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@unocss/reset": "^66.3.3",
