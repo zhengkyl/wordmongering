@@ -12,6 +12,8 @@ CREATE TABLE results (
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
+CREATE INDEX results_day ON results(day);
+
 CREATE TABLE reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_hint TEXT NOT NULL,
@@ -22,5 +24,6 @@ CREATE TABLE reports (
 
 -- +goose Down
 DROP TABLE reports;
+DROP INDEX results_day;
 DROP TABLE results;
 DROP TABLE puzzles;

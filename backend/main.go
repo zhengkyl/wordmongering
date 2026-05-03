@@ -5,12 +5,10 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sync"
 	"syscall"
 	"time"
 
@@ -29,10 +27,12 @@ func setupDB(dbPath string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
+	db.Exec("PRAGMA journal_mode=WAL")
+	db.Exec("PRAGMA foreign_keys=ON")
+
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return nil, err
 	}
-
 	goose.SetBaseFS(embedMigrations)
 	if err := goose.Up(db, "migrations"); err != nil {
 		return nil, fmt.Errorf("run migrations: %w", err)
@@ -44,17 +44,33 @@ func run(ctx context.Context) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	db, err := setupDB("./data/app.db")
+	root, ok := os.LookupEnv("ROOT")
+	if !ok {
+		root = ".."
+	}
+
+	db, err := setupDB(filepath.Join(root, "data/app.db"))
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
+	api, err := newApiHandler(db, root, os.Getenv("BLOOM_FILTER_PEPPER"))
+	if err != nil {
+		return err
+	}
+
+	apiMux := http.NewServeMux()
+	apiMux.HandleFunc("GET /api/dailies/{day}/puzzle", api.handleGetPuzzle)
+	apiMux.HandleFunc("GET /api/dailies/{day}/results", api.handleGetResults)
+	apiMux.HandleFunc("POST /api/dailies/{day}/results", api.handlePostResults)
+
 	mux := http.NewServeMux()
+	mux.Handle("/api/", rateLimitMiddleware(apiMux))
+	mux.Handle("/", newSpaHandler(filepath.Join(root, "client/dist")))
 
 	var handler http.Handler = mux
 	handler = logMiddleware(handler)
-	handler = rateLimitMiddleware(handler)
 
 	server := &http.Server{
 		Addr:         ":3000",
@@ -86,74 +102,4 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
-}
-
-type responseWriter struct {
-	http.ResponseWriter
-	status int
-}
-
-func (rw *responseWriter) WriteHeader(status int) {
-	rw.status = status
-	rw.ResponseWriter.WriteHeader(status)
-}
-
-func logMiddleware(h http.Handler) http.Handler {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		start := time.Now()
-
-		wrapped := &responseWriter{ResponseWriter: w, status: http.StatusOK}
-		h.ServeHTTP(wrapped, r)
-
-		slog.Debug("request",
-			"start", start,
-			"duration", time.Since(start),
-			"ip", r.Header.Get("X-Real-Ip"),
-			"method", r.Method,
-			"path", r.URL.Path,
-			"status", wrapped.status,
-		)
-	})
-}
-
-type rateLimiter struct {
-	mu        sync.Mutex
-	counts    map[string]int
-	prevReset time.Time
-	limit     int
-	window    time.Duration
-}
-
-func (rl *rateLimiter) allow(ip string) bool {
-	if time.Since(rl.prevReset) >= rl.window {
-		rl.mu.Lock()
-		clear(rl.counts)
-		rl.mu.Unlock()
-		return true
-	}
-
-	reqs, ok := rl.counts[ip]
-	if ok && reqs >= rl.limit {
-		return false
-	}
-
-	rl.counts[ip]++
-	return true
-}
-
-func rateLimitMiddleware(h http.Handler) http.Handler {
-	rl := &rateLimiter{counts: make(map[string]int), prevReset: time.Now()}
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := r.Header.Get("X-Real-Ip")
-		if !rl.allow(ip) {
-			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
-			return
-		}
-		h.ServeHTTP(w, r)
-	})
 }
