@@ -52,7 +52,6 @@ function GameOrResults({ day, puzzle }: { day: number; puzzle: string }) {
 
   return (
     <Game
-      day={day}
       puzzle={puzzle}
       onComplete={(words) => {
         const { plays } = updateDayResults(day, words);

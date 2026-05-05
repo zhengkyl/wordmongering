@@ -68,13 +68,11 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	apiMux := http.NewServeMux()
-	apiMux.HandleFunc("GET /api/dailies/{day}/puzzle", api.handleGetPuzzle)
-	apiMux.HandleFunc("GET /api/dailies/{day}/results", api.handleGetResults)
-	apiMux.HandleFunc("POST /api/dailies/{day}/results", api.handlePostResults)
-
 	mux := http.NewServeMux()
-	mux.Handle("/api/", rateLimitMiddleware(apiMux))
+	mux.Handle("GET /api/dailies/{day}/puzzle", rateLimitMiddleware(api.handleGetPuzzle, 1000))
+	mux.Handle("GET /api/dailies/{day}/results", rateLimitMiddleware(api.handleGetResults, 100))
+	mux.Handle("POST /api/dailies/{day}/results", rateLimitMiddleware(api.handlePostResults, 10))
+	mux.Handle("POST /api/reports", rateLimitMiddleware(api.handlePostMissingWord, 10))
 	mux.Handle("/", newSpaHandler(filepath.Join(root, "client/dist")))
 
 	var handler http.Handler = mux

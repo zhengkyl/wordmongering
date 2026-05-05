@@ -6,12 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+var epoch = time.Date(2026, time.April, 26, 0, 0, 0, 0, time.UTC)
+
+func dayToDate(day int) time.Time {
+	return epoch.AddDate(0, 0, day)
+}
 
 type puzzle struct {
 	day    int
@@ -178,7 +185,8 @@ func (m model) viewList() string {
 		s += dimStyle.Render("No puzzles yet.") + "\n"
 	}
 	for i, p := range m.puzzles {
-		line := fmt.Sprintf("Day %-4d  %s", p.day, p.puzzle)
+		date := dayToDate(p.day)
+		line := fmt.Sprintf("Day %-4d  %s  %s", p.day, date.Format("Jan 02"), p.puzzle)
 		if i == m.cursor {
 			s += selectedStyle.Render("> " + line)
 		} else {

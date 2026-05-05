@@ -21,7 +21,7 @@ export function Modal({
       }}
       class="bg-transparent min-w-sm"
     >
-      <div class="sketchy-lg bg-background p-6">
+      <div class="bg-background rounded-xl p-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="font-bold text-lg">{title}</h2>
           <button class="p-1 -mr-1" onClick={onClose}>

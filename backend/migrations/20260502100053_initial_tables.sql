@@ -17,8 +17,8 @@ CREATE INDEX results_day ON results(day);
 CREATE TABLE reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_hint TEXT NOT NULL,
-    word TEXT NOT NULL,
-    context TEXT,
+    word TEXT,
+    note TEXT,
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 

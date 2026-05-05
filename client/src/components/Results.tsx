@@ -1,6 +1,6 @@
 import { Link } from "wouter-preact";
 import { cl } from "../lib/cl";
-import { wordGreenIndexes } from "../lib/computeGreenTiles";
+import { inputUsedIndexes } from "../lib/computeGreenTiles";
 import { getStats, type GameResult } from "../lib/storage";
 import { ScoreDistribution } from "./ScoreDistribution";
 
@@ -16,7 +16,7 @@ export function ResultsPage({ day, puzzle, gameResult, onPlayAgain }: Props) {
 
   let tempPuzzle = puzzle;
   const wordsTiles = gameResult.words.map((word) => {
-    const indexes = wordGreenIndexes(tempPuzzle, word);
+    const indexes = inputUsedIndexes(tempPuzzle, word);
     tempPuzzle = tempPuzzle.slice(indexes.length);
     const tiles = [];
     for (let i = 0; i < word.length; i++) {

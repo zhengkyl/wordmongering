@@ -1,22 +1,27 @@
-export const TILE_PX = 48;
-export const SNAKE_COLS = 4;
-export const H_STEP = 52;
-export const V_STEP = 68;
-export const WAVE = 8;
-export const POP_DURATION = 350;
-export const STEP_MS = 150;
+const SERP_WIDTH = 100; // full horizontal extent
+const SERP_RADIUS = 50; // bend radius
+const SERP_SPACING = 100; // arc-length between points
 
-export type ShapeStep = { dx: number; dy: number };
-export type ShapeFunc = (index: number, total: number) => ShapeStep;
+export function serpentine(index: number) {
+  const s = index * SERP_SPACING;
+  const halfLen = SERP_WIDTH + Math.PI * SERP_RADIUS;
+  const half = Math.floor(s / halfLen);
+  const t = s - half * halfLen;
+  const y0 = -half * 2 * SERP_RADIUS;
 
-export const snakeShape: ShapeFunc = (index, _total) => {
-  if (index === 0) return { dx: 0, dy: 0 };
-  const colInRow = index % SNAKE_COLS;
-  const row = Math.floor(index / SNAKE_COLS);
-  const dir = row % 2 === 0 ? 1 : -1;
-  if (colInRow === 0) return { dx: 0, dy: -(V_STEP - 2 * WAVE) };
-  const wave = colInRow === 1 || colInRow === SNAKE_COLS - 1 ? WAVE : 0;
-  return { dx: dir * H_STEP, dy: -wave };
-};
+  if (t <= SERP_WIDTH) {
+    return {
+      x: half % 2 === 0 ? t - SERP_WIDTH / 2 : SERP_WIDTH / 2 - t,
+      y: y0,
+    };
+  }
 
-export const activeShape: ShapeFunc = snakeShape;
+  const a = (t - SERP_WIDTH) / SERP_RADIUS;
+  return {
+    x:
+      half % 2 === 0
+        ? SERP_WIDTH / 2 + SERP_RADIUS * Math.sin(a)
+        : -SERP_WIDTH / 2 - SERP_RADIUS * Math.sin(a),
+    y: y0 - SERP_RADIUS + SERP_RADIUS * Math.cos(a),
+  };
+}

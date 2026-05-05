@@ -67,8 +67,13 @@ func (rl *rateLimiter) allow(ip string) bool {
 	return true
 }
 
-func rateLimitMiddleware(h http.Handler) http.Handler {
-	rl := &rateLimiter{counts: make(map[string]int), prevReset: time.Now()}
+func rateLimitMiddleware(h http.HandlerFunc, rpm int) http.Handler {
+	rl := &rateLimiter{
+		counts:    make(map[string]int),
+		prevReset: time.Now(),
+		limit:     rpm,
+		window:    60 * time.Second,
+	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := r.Header.Get("X-Real-Ip")
@@ -76,6 +81,6 @@ func rateLimitMiddleware(h http.Handler) http.Handler {
 			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 			return
 		}
-		h.ServeHTTP(w, r)
+		h(w, r)
 	})
 }

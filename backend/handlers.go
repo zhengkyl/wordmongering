@@ -213,3 +213,38 @@ func (a *api) handlePostResults(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 }
+
+type reportBody struct {
+	PlayerHint string `json:"playerHint"`
+	Word       string `json:"word"`
+	Note       string `json:"note"`
+}
+
+func (a *api) handlePostMissingWord(w http.ResponseWriter, r *http.Request) {
+	var body reportBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	if len(body.PlayerHint) < 10 || len(body.PlayerHint) > 64 {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	if len(body.Word) < 1 || len(body.Word) > 64 {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	if len(body.Note) > 1000 {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := a.db.Exec("INSERT INTO reports (player_hint, word, note) VALUES (?, ?, ?)", body.PlayerHint, body.Word, body.Note); err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}

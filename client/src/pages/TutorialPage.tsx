@@ -37,7 +37,7 @@ export function TutorialPage() {
 
       <Link
         href="/daily/1"
-        class="sketchy-md px-4 py-2 font-bold text-center bg-blue-500 text-white"
+        class="px-4 py-2 font-bold text-center bg-blue-500 text-white"
       >
         Play Today
       </Link>

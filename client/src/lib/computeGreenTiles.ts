@@ -1,33 +1,31 @@
-export type EnemyTile = { id: number; letter: string };
+export type PuzzleTile = { id: number; letter: string };
 
-export function computeEnemyGreenTiles(
-  enemy: EnemyTile[],
-  input: string,
-): { green: Set<number>; candidate: Set<number> } {
-  const counts = new Map<string, number>();
-  for (const c of input.toLowerCase()) {
-    counts.set(c, (counts.get(c) ?? 0) + 1);
-  }
+export function puzzleMatchedTiles(puzzleTiles: PuzzleTile[], input: string) {
+  let matched: number[] = [];
+  let candidates: number[] = [];
+  let maybeUsed: number[] = [];
+  let chain = true;
+  for (const tile of puzzleTiles) {
+    let i = 0;
+    for (; i < input.length; i++) {
+      if (input.charAt(i) !== tile.letter) continue;
+      if (maybeUsed.includes(i)) continue;
+      maybeUsed.push(i);
 
-  const candidate = new Set<number>();
-  for (const { id, letter } of enemy) {
-    const count = counts.get(letter) ?? 0;
-    if (count > 0) {
-      candidate.add(id);
-      counts.set(letter, count - 1);
+      candidates.push(tile.id);
+      if (chain) matched.push(tile.id);
+
+      break;
+    }
+    if (i === input.length) {
+      chain = false;
     }
   }
 
-  const green = new Set<number>();
-  for (const { id } of enemy) {
-    if (!candidate.has(id)) break;
-    green.add(id);
-  }
-
-  return { green, candidate };
+  return { matched, candidates };
 }
 
-export function wordGreenIndexes(puzzle: string, word: string) {
+export function inputUsedIndexes(puzzle: string, word: string) {
   const greenIndexes: number[] = [];
   for (const c of puzzle) {
     let i = 0;

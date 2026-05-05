@@ -2,8 +2,8 @@ package game
 
 import "slices"
 
-func poppedIndexes(puzzle []rune, word []rune) []int {
-	var popped []int
+func usedInputIndexes(puzzle []rune, word []rune) []int {
+	var used []int
 
 	for _, c := range puzzle {
 		found := false
@@ -11,11 +11,11 @@ func poppedIndexes(puzzle []rune, word []rune) []int {
 			if ic != c {
 				continue
 			}
-			if slices.Contains(popped, i) {
+			if slices.Contains(used, i) {
 				continue
 			}
 
-			popped = append(popped, i)
+			used = append(used, i)
 			found = true
 			break
 		}
@@ -24,7 +24,7 @@ func poppedIndexes(puzzle []rune, word []rune) []int {
 			break
 		}
 	}
-	return popped
+	return used
 }
 
 func IsValidGame(puzzle string, words []string) bool {
@@ -34,11 +34,11 @@ func IsValidGame(puzzle string, words []string) bool {
 		if len(pz) == 0 {
 			return false
 		}
-		popped := poppedIndexes(pz, []rune(word))
-		if len(popped) == 0 {
+		used := usedInputIndexes(pz, []rune(word))
+		if len(used) == 0 {
 			return false
 		}
-		pz = pz[len(popped):]
+		pz = pz[len(used):]
 	}
 	return len(pz) == 0
 }
