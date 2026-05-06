@@ -19,6 +19,8 @@
 
 `dictionary.txt` is based on the [Letterpress word list](https://github.com/lorenbrichter/Words) (CC0). Changes after 7a08f2f are my own.
 
+`top5000.txt` is from [www.wordfrequency.info](https://www.wordfrequency.info). Top lemmas from the Corpus of Contemporary American English (COCA)
+
 ### Other word lists
 
 - https://github.com/dwyl/english-words
@@ -28,7 +30,7 @@
 
 ## Development
 
-Make sure to access development site via vite's port (probably localhost:5173). Api requests are proxied by vite to port 3000 (hardcoded in vite.config.ts and main.go)
+Make sure to access development site via vite's port (probably localhost:5173). Api requests are proxied by vite to a different port.
 
 ```sh
 make install
@@ -39,7 +41,7 @@ make dev
 
 ## Deploy
 
-The server listens at `localhost:3000`. It expects the `X-Real-IP` header for rate-limiting.
+The server listens at `localhost:2704`. It expects the `X-Real-IP` header for rate-limiting.
 
 ### Docker Compose
 

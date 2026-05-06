@@ -52,20 +52,19 @@ function GameOrResults({ day, puzzle }: { day: number; puzzle: string }) {
 
   return (
     <Game
+      day={day}
       puzzle={puzzle}
       onComplete={(words) => {
         const { plays } = updateDayResults(day, words);
-        if (plays === 1) {
-          fetch(`/api/dailies/${day}/results`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: AbortSignal.timeout(1000),
-            body: JSON.stringify({
-              playerHint: getPlayerHint(),
-              words,
-            }),
-          });
-        }
+        fetch(`/api/dailies/${day}/results`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(1000),
+          body: JSON.stringify({
+            playerHint: getPlayerHint(),
+            words,
+          }),
+        });
         // TODO Game errors if not switched immediately after onComplete
         // fetch isn't called in time for data to show in result charts
         setResults({ words, plays });

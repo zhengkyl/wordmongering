@@ -3,7 +3,7 @@ services:
     image: ghcr.io/zhengkyl/wordmongering:latest
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${PORT:-2704}:${PORT:-2704}"
     volumes:
       - data:/app/data
 

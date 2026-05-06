@@ -1,20 +1,50 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { cl } from "../lib/cl";
 import type { PuzzleTile } from "../lib/computeGreenTiles";
 import { puzzleMatchedTiles } from "../lib/computeGreenTiles";
-import { POP_DURATION, serpentine, STEP_MS, TILE_PX } from "../lib/shapes";
+import { LOCAL_WM_EPOCH, MS_PER_DAY } from "../lib/daily";
+import { serpentine, serpentineIndexForHeight } from "../lib/shapes";
+import { soundEnabled } from "../lib/sound";
 import { ReportModal } from "./ReportModal";
+
+const POP_DURATION = 350;
+const POP_STAGGER_MS = 60;
+const POP_PEAK_MS = POP_DURATION * 0.25;
+const STEP_MS = 150;
+const TILE_PX = 48;
+
+let audioCtx: AudioContext | null = null;
+
+function playPop(delayMs: number, index: number) {
+  if (!soundEnabled) return;
+  if (!audioCtx) audioCtx = new AudioContext();
+  const ctx = audioCtx;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  const t = ctx.currentTime + delayMs / 1000;
+  const base = 500 * Math.pow(2, (index * 2) / 12);
+  osc.frequency.setValueAtTime(base * 1.5, t);
+  osc.frequency.exponentialRampToValueAtTime(base * 0.15, t + 0.08);
+  gain.gain.setValueAtTime(0.25, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  osc.start(t);
+  osc.stop(t + 0.12);
+}
 
 type GamePhase =
   | { type: "intro"; offset: number }
   | { type: "idle" }
   | { type: "popping"; count: number }
-  | { type: "sliding"; offset: number };
+  | { type: "sliding"; offset: number; initialOffset: number };
 
 export function Game({
+  day,
   puzzle,
   onComplete,
 }: {
+  day: number;
   puzzle: string;
   onComplete: (words: string[]) => void;
 }) {
@@ -24,12 +54,16 @@ export function Game({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const usedWordsRef = useRef<string[]>([]);
+  const prevMatchedCountRef = useRef(0);
 
   const [tiles, setTiles] = useState<PuzzleTile[]>(
     puzzle.split("").map((letter, id) => ({ id, letter })),
   );
 
-  const [phase, setPhase] = useState<GamePhase>({ type: "intro", offset: puzzle.length });
+  const [phase, setPhase] = useState<GamePhase>(() => ({
+    type: "intro",
+    offset: Math.ceil(serpentineIndexForHeight(window.innerHeight)) + 1,
+  }));
 
   const [input, setInput] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -46,9 +80,12 @@ export function Game({
     return () => document.removeEventListener("keydown", refocusOnType);
   }, []);
 
-  useEffect(() => {
-    setPhase({ type: "intro", offset: puzzle.length - 1 });
-    window.scrollTo(0, document.body.scrollHeight - window.innerHeight);
+  useLayoutEffect(() => {
+    window.scrollTo(0, document.body.scrollHeight);
+    setPhase((prev) => {
+      if (prev.type !== "intro") return prev;
+      return { type: "intro", offset: prev.offset - 1 };
+    });
   }, []);
 
   useEffect(() => {
@@ -108,6 +145,10 @@ export function Game({
     }
 
     const word = input.toLowerCase();
+    if (usedWordsRef.current.includes(word)) {
+      triggerError("Cannot repeat words");
+      return;
+    }
     if (!dictionaryRef.current!.has(word)) {
       triggerError("Not in dictionary");
       return;
@@ -121,46 +162,66 @@ export function Game({
     setInput("");
     setPhase({ type: "popping", count: greenCount });
 
-    setTimeout(() => {
-      setTiles(nextEnemy);
-      if (nextEnemy.length === 0) {
-        onComplete(usedWordsRef.current);
-        return;
-      }
-      setPhase({ type: "sliding", offset: greenCount });
-      setTimeout(() => {
-        setPhase({ type: "sliding", offset: greenCount - 1 });
-      }, STEP_MS);
-    }, POP_DURATION);
+    for (let i = 0; i < greenCount; i++) {
+      playPop(i * POP_STAGGER_MS + POP_PEAK_MS, i);
+    }
+
+    setTimeout(
+      () => {
+        setTiles(nextEnemy);
+        if (nextEnemy.length === 0) {
+          onComplete(usedWordsRef.current);
+          return;
+        }
+        setPhase({ type: "sliding", offset: greenCount, initialOffset: greenCount });
+        setTimeout(() => {
+          setPhase({ type: "sliding", offset: greenCount - 1, initialOffset: greenCount });
+        }, STEP_MS);
+      },
+      POP_DURATION + (greenCount - 1) * POP_STAGGER_MS,
+    );
   }
 
-  const activePos = positions[matched.length];
+  const dayDate = new Date(LOCAL_WM_EPOCH + (day - 1) * MS_PER_DAY);
+  const formattedDate = dayDate.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  function getTileDuration() {
+    if (phase.type === "intro") {
+      const maxOffset = Math.ceil(serpentineIndexForHeight(window.innerHeight)) + 1;
+      const t = phase.offset / maxOffset;
+      return Math.round(40 + 110 * (1 - t) ** 4);
+    }
+    if (phase.type === "sliding") {
+      const t = phase.offset / phase.initialOffset;
+      return Math.round(50 + 100 * (1 - t) ** 4);
+    }
+    return 150;
+  }
+  const tileDuration = getTileDuration();
+
+  const cursorVisible = phase.type === "idle" && matched.length < tiles.length;
 
   return (
-    <div class="relative max-w-screen-sm mx-auto flex-grow-1 flex flex-col">
-      <div class="relative m-auto" style={{ width: containerW, height: containerH }}>
-        {phase.type === "idle" && (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 100 100"
-            class="w-14 h-14 absolute -ml-1 -mt-1"
-            style={{
-              transform: `translate(${activePos.x}px, ${activePos.y}px)`,
-              transition: `transform 150ms linear`,
-              // zIndex: tiles.length - index,
-            }}
-          >
-            <path
-              class="march"
-              fill="none"
-              stroke="#000"
-              d="M91 91c-6 5-76 5-82 0-5-6-5-76 0-82 6-5 76-5 82 0 5 6 5 76 0 82"
-            />
-          </svg>
-        )}
+    <div class="max-w-screen-sm mx-auto flex-grow-1 flex flex-col relative">
+      <div
+        class="absolute left-0 right-0 text-center bottom-60vh overflow-hidden"
+        style={{ animation: "fade-out 0.8s ease-out 1s forwards" }}
+      >
+        <div class="font-bold leading-none text-8xl whitespace-pre">Day {day}</div>
+        <div class="mt-1">{formattedDate}</div>
+      </div>
+      <div
+        class="isolate relative mt-auto mx-auto"
+        style={{ width: containerW, height: containerH }}
+      >
         {tiles.map(({ id, letter }, index) => {
           const { x, y } = positions[index + (slideOffset ?? 0)];
           const isPopping = poppingCount !== null && index < poppingCount;
+          const isMatched = matched.includes(id);
+          const isNewlyMatched = isMatched && index >= prevMatchedCountRef.current;
           return (
             <div
               key={id}
@@ -171,164 +232,131 @@ export function Game({
                       setPhase((prev) => {
                         if (prev.type !== "intro" && prev.type !== "sliding") return prev;
                         if (prev.offset === 0) {
-                          if (prev.type === "intro") {
-                            requestAnimationFrame(() => {
-                              window.scrollTo({
-                                top: document.body.scrollHeight - window.innerHeight,
-                                behavior: "instant",
-                              });
-                            });
-                          }
                           return { type: "idle" };
                         }
-                        return { type: prev.type, offset: prev.offset - 1 };
+                        if (prev.type === "intro") {
+                          return { type: "intro", offset: prev.offset - 1 };
+                        }
+                        return { ...prev, offset: prev.offset - 1 };
                       });
                     }
                   : undefined
               }
               style={{
                 transform: `translate(${x}px, ${y}px)`,
-                transition: `transform ${STEP_MS}ms linear`,
-                zIndex: tiles.length - index,
+                transition: `transform ${tileDuration}ms linear`,
               }}
-              class={cl(["absolute top-0 left-0 w-12 h-12 select-none", isPopping && "pop-out "])}
+              class="absolute top-0 left-0 w-12 h-12 select-none"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 100 100"
-                class="absolute inset-0"
-              >
-                <path
-                  class={cl([
-                    matched.includes(id)
-                      ? "fill-green-200"
-                      : candidates.includes(id)
-                        ? "fill-orange-100"
-                        : "fill-orange-200",
-                  ])}
-                  d="M50 0c43 0 50 7 50 50s-7 50-50 50S0 93 0 50 7 0 50 0"
-                />
-              </svg>
               <div
-                class={cl([
-                  "absolute inset-0 flex justify-center items-center font-bold text-2xl uppercase",
-                ])}
+                class={cl(["absolute inset-0", isPopping && "pop-out"])}
+                style={{ animationDelay: isPopping ? `${index * POP_STAGGER_MS}ms` : undefined }}
               >
-                {letter}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 100 100"
+                  class="absolute inset-0"
+                >
+                  <path
+                    class={
+                      isNewlyMatched
+                        ? "match-green fill-orange-200"
+                        : isMatched
+                          ? "fill-green-300"
+                          : candidates.includes(id)
+                            ? "fill-orange-300"
+                            : "fill-orange-200"
+                    }
+                    style={
+                      isNewlyMatched
+                        ? {
+                            animationDelay: `${(index - prevMatchedCountRef.current) * 30}ms`,
+                          }
+                        : undefined
+                    }
+                    d="M50 0c43 0 50 7 50 50s-7 50-50 50S0 93 0 50 7 0 50 0"
+                  />
+                </svg>
+                <div class="absolute inset-0 flex justify-center items-center font-bold text-2xl uppercase">
+                  {letter}
+                </div>
               </div>
             </div>
           );
         })}
-      </div>
-
-      <div class="text-center p-4">
-        <div>Type a word containing this letter</div>
-        <div>(and as many following letters as you can)</div>
-
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 31.5 62.2"
-          class="absolute top-0 left-0 w-24px"
-          style={{
-            transform: `translate(${positions[0].x - 32}px, ${positions[0].y + TILE_PX - 8}px)`,
-          }}
-        >
-          <g fill="none" stroke="#000" stroke-linecap="round" stroke-width="4">
-            <path d="M21 42.7c.6 3.4 3.3 6 5.5 8.5.8 1 2.7 1.9 2.9 3-1 1.5-3 1.2-4.3 2.1-3.3 1.3-6.5 3-10 4" />
-            <path d="M8.3 1.9c-1.8 4.6-2.8 9.6-4.1 14.4a72 72 0 0 0-2 20.5c0 3 .4 6.1 2.3 8.6 2 2.8 5 4.8 8.2 5.7 3.8 1.4 6.2 2 13.8 2.7" />
-          </g>
-        </svg>
-      </div>
-      <div class="mt-auto max-w-screen-sm z-10 px-4 py-2">
-        <div class="relative">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onInput={(e) => {
-              setInput((e.target as HTMLInputElement).value.trim());
-              setErrorMsg(null);
+        {cursorVisible && (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 100 100"
+            class="w-14 h-14 absolute -ml-1 -mt-1 transition-transform"
+            style={{
+              transform: `translate(${positions[matched.length].x}px, ${positions[matched.length].y}px)`,
             }}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            class={cl([
-              "w-full h-14 pl-3 pr-20 sm:(text-xl h-16 pl-4 pr-22) rounded-xl font-bold uppercase tracking-widest transition-colors bg-orange-100 outline-none",
-              errorMsg && "ring-4 ring-red-500/60",
-            ])}
-            placeholder="type a word..."
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            spellcheck={false}
-          />
-          <button
-            class="absolute top-2 right-2 sm:(top-3 right-3) rounded-md h-10 px-3 font-bold text-white bg-blue-500 @hover:bg-blue-600 !active:bg-blue-700"
-            onClick={handleSubmit}
           >
-            PLAY
-          </button>
+            <path
+              class="march"
+              fill="none"
+              stroke="#000"
+              d="M91 91c-6 5-76 5-82 0-5-6-5-76 0-82 6-5 76-5 82 0 5 6 5 76 0 82"
+            />
+          </svg>
+        )}
+      </div>
+
+      <div
+        class="max-w-screen-sm px-4 opacity-0"
+        style={{ animation: "fade-in 0.8s ease-out 1.5s forwards" }}
+      >
+        <div
+          class={cl(["text-center py-4 transition-opacity", phase.type === "intro" && "opacity-0"])}
+        >
+          <div>Type a word containing this letter</div>
+          <div>(and as many following letters as you can)</div>
         </div>
-        <div class="flex h-9 px-3 sm:px-4 py-2 gap-2 text-sm text-red-600" role="alert">
-          <span>{errorMsg}</span>
-          {errorMsg === "Not in dictionary" && (
+        <div class="py-2">
+          <div class="relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onInput={(e) => {
+                const newInput = (e.target as HTMLInputElement).value.trim();
+                prevMatchedCountRef.current = matched.length;
+                setInput(newInput);
+                setErrorMsg(null);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              class={cl([
+                "w-full h-14 pl-3 pr-20 sm:(text-xl h-16 pl-4 pr-22) rounded-xl font-bold uppercase tracking-widest transition-colors bg-orange-100 outline-none",
+                errorMsg && "ring-4 ring-red-500/60",
+              ])}
+              placeholder="type a word..."
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck={false}
+            />
             <button
-              class="underline text-red-400 hover:text-red-600"
-              onClick={() => setReportWord(input)}
+              class="absolute top-2 right-2 sm:(top-3 right-3) rounded-md h-10 px-3 font-bold text-white bg-blue-500 @hover:bg-blue-600 !active:bg-blue-700"
+              onClick={handleSubmit}
             >
-              Report missing word
+              PLAY
             </button>
-          )}
+          </div>
+          <div class="flex h-9 px-3 sm:px-4 py-2 gap-2 text-sm text-red-600" role="alert">
+            <span>{errorMsg}</span>
+            {errorMsg === "Not in dictionary" && (
+              <button
+                class="underline text-red-400 hover:text-red-600"
+                onClick={() => setReportWord(input)}
+              >
+                Report missing word
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {reportWord !== null && <ReportModal word={reportWord} onClose={() => setReportWord(null)} />}
-      <svg class="hidden" viewBox="0 0 1 1" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <clipPath id="SquircleClip-1" clipPathUnits="objectBoundingBox">
-            <path
-              d="M 0,0.5
-                C 0,0  0,0  0.5,0
-                  1,0  1,0  1,0.5
-                  1,1  1,1  0.5,1
-                  0,1  0,1  0,0.5"
-            ></path>
-          </clipPath>
-          <clipPath id="SquircleClip-2" clipPathUnits="objectBoundingBox">
-            <path
-              d="M 0,0.5
-                C 0,0.0575  0.0575,0  0.5,0
-                  0.9425,0  1,0.0575  1,0.5
-                  1,0.9425  0.9425,1  0.5,1
-                  0.0575,1  0,0.9425  0,0.5"
-            ></path>
-          </clipPath>
-          <clipPath id="SquircleClip-3" clipPathUnits="objectBoundingBox">
-            <path
-              d="M 0,0.5
-                C 0,0.115  0.115,0  0.5,0
-                  0.885,0  1,0.115  1,0.5
-                  1,0.885  0.885,1  0.5,1
-                  0.115,1  0,0.885  0,0.5"
-            ></path>
-          </clipPath>
-          <clipPath id="SquircleClip-4" clipPathUnits="objectBoundingBox">
-            <path
-              d="M 0,0.5
-                C 0,0.1725  0.1725,0  0.5,0
-                  0.8275,0  1,0.1725  1,0.5
-                  1,0.8275  0.8275,1  0.5,1
-                  0.1725,1  0,0.8275  0,0.5"
-            ></path>
-          </clipPath>
-          <clipPath id="SquircleClip-5" clipPathUnits="objectBoundingBox">
-            <path
-              d="M 0,0.5
-                C 0,0.23  0.23,0  0.5,0
-                  0.77,0  1,0.23  1,0.5
-                  1,0.77  0.77,1  0.5,1
-                  0.23,1  0,0.77  0,0.5"
-            ></path>
-          </clipPath>
-        </defs>
-      </svg>
     </div>
   );
 }

@@ -2,6 +2,11 @@ const SERP_WIDTH = 100; // full horizontal extent
 const SERP_RADIUS = 50; // bend radius
 const SERP_SPACING = 100; // arc-length between points
 
+export function serpentineIndexForHeight(heightPx: number): number {
+  const halfLen = SERP_WIDTH + Math.PI * SERP_RADIUS;
+  return (heightPx / (2 * SERP_RADIUS)) * (2 * halfLen / SERP_SPACING);
+}
+
 export function serpentine(index: number) {
   const s = index * SERP_SPACING;
   const halfLen = SERP_WIDTH + Math.PI * SERP_RADIUS;

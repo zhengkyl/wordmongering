@@ -179,12 +179,6 @@ func (a *api) handlePostResults(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
-	for _, word := range body.Words {
-		if len(word) < 1 || len(word) > 32 {
-			http.Error(w, "Bad request", http.StatusBadRequest)
-			return
-		}
-	}
 
 	var puzzle string
 	if err := a.db.QueryRow("SELECT puzzle FROM puzzles WHERE day = ?", day).Scan(&puzzle); err != nil {
@@ -192,11 +186,21 @@ func (a *api) handlePostResults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	seen := make(map[string]struct{}, len(body.Words))
 	for _, word := range body.Words {
+		if len(word) < 1 || len(word) > 32 {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
 		if !a.dict.Test([]byte(word + a.pepper)) {
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
+		if _, dup := seen[word]; dup {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+		seen[word] = struct{}{}
 	}
 
 	if !game.IsValidGame(puzzle, body.Words) {

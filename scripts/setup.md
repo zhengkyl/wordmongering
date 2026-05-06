@@ -179,7 +179,7 @@ server {
     ssl_certificate_key /etc/ssl/cloudflare/origin.key;
 
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:2704;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $http_cf_connecting_ip;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

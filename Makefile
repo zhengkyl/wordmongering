@@ -1,11 +1,14 @@
 .PHONY: dev dev-dash build install start start-dash addword addwords
 
+DEV_PORT ?= 3000
+PORT ?= 2704
+
 install:
 	cd client && pnpm install
 	cd backend && go mod download
 
 dev:
-	trap 'kill %1' EXIT; cd client && pnpm dev & cd backend && go run .
+	trap 'kill %1' EXIT; cd client && PORT=$(PORT) pnpm dev --port $(DEV_PORT) --host & cd backend && PORT=$(PORT) go run .
 
 dev-dash:
 	cd backend && go run cmd/dashboard/dashboard.go

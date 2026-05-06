@@ -20,6 +20,8 @@ WORKDIR /app
 COPY --from=go-builder /bin/server /bin/server
 COPY --from=go-builder /bin/dashboard /bin/dashboard
 COPY --from=client-builder /app/dist ./client/dist
-EXPOSE 3000
+ARG PORT=2704
+ENV PORT=$PORT
+EXPOSE $PORT
 ENV ROOT=/app
 CMD ["/bin/server"]

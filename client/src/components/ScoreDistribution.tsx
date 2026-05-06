@@ -28,7 +28,7 @@ export function ScoreDistribution({ day, playerScore, plays }: Props) {
   return (
     <div class="flex flex-col gap-4 mt-4">
       <div class="flex items-center justify-between">
-        <div class="font-semibold text-sm">Everyone's scores</div>
+        <div class="font-semibold">Score distribution</div>
         <div class="flex text-xs">
           <button
             class={cl([

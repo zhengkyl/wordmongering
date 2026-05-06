@@ -78,8 +78,13 @@ func run(ctx context.Context) error {
 	var handler http.Handler = mux
 	handler = logMiddleware(handler)
 
+	port, ok := os.LookupEnv("PORT")
+	if !ok {
+		port = "2704"
+	}
+
 	server := &http.Server{
-		Addr:         ":3000",
+		Addr:         ":" + port,
 		Handler:      handler,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,

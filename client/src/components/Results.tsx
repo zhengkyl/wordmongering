@@ -26,9 +26,9 @@ export function ResultsPage({ day, puzzle, gameResult, onPlayAgain }: Props) {
   });
 
   return (
-    <div class="max-w-screen-sm m-auto p-4 bg-background flex flex-col gap-2">
-      <div class="font-bold text-xl text-center">Congratulations!</div>
-      <div class="grid grid-cols-3 text-center">
+    <div class="max-w-screen-sm mx-auto mt-20 p-4 bg-background flex flex-col gap-8">
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="font-bold text-xl text-center col-span-3">Congratulations!</div>
         <div>
           <div class="font-bold text-2xl">{daysPlayed}</div>
           <div class="text-sm text-gray-500">Days Played</div>
@@ -41,8 +41,6 @@ export function ResultsPage({ day, puzzle, gameResult, onPlayAgain }: Props) {
           <div class="font-bold text-2xl">{bestStreak}</div>
           <div class="text-sm text-gray-500">Best Streak</div>
         </div>
-      </div>
-      <div class="grid grid-cols-3">
         <Link
           href="/"
           class="justify-self-center bg-orange-100 @hover:bg-orange-200 !active:bg-orange-300 rounded-xl px-3 py-2 font-semibold"
@@ -81,9 +79,13 @@ export function ResultsPage({ day, puzzle, gameResult, onPlayAgain }: Props) {
           </svg>
         </button>
       </div>
-      <div class="flex flex-col gap-4 mt-4">
-        <div class="font-semibold text-sm">Your moves</div>
-        <ul class="flex flex-col gap-2 list-decimal pl-4">
+      <ScoreDistribution day={day} playerScore={wordsTiles.length} plays={gameResult.plays} />
+      <details class="mt-4 group">
+        <summary class="font-semibold cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex justify-between items-center">
+          Your moves
+          <span class="inline-block transition-transform group-open:-rotate-90">{"<"}</span>
+        </summary>
+        <ul class="flex flex-col gap-2 list-decimal pl-4 mt-4">
           {wordsTiles.map((tiles, i) => (
             <li key={i} class="">
               <div class="font-bold uppercase">
@@ -102,8 +104,7 @@ export function ResultsPage({ day, puzzle, gameResult, onPlayAgain }: Props) {
             </li>
           ))}
         </ul>
-      </div>
-      <ScoreDistribution day={day} playerScore={wordsTiles.length} plays={gameResult.plays} />
+      </details>
     </div>
   );
 }
