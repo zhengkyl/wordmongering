@@ -6,7 +6,7 @@ RUN pnpm install --frozen-lockfile
 COPY client .
 RUN pnpm build
 
-FROM golang:1.24-alpine AS go-builder
+FROM golang:1.26-alpine AS go-builder
 WORKDIR /app
 RUN apk add --no-cache gcc musl-dev
 COPY backend/go.mod backend/go.sum ./
