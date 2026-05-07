@@ -16,6 +16,7 @@ RUN go build -ldflags='-extldflags "-static"' -o /bin/server . && \
     go build -ldflags='-extldflags "-static"' -o /bin/dashboard ./cmd/dashboard
 
 FROM alpine:3.20
+RUN apk add --no-cache sqlite
 WORKDIR /app
 COPY --from=go-builder /bin/server /bin/server
 COPY --from=go-builder /bin/dashboard /bin/dashboard
