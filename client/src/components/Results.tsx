@@ -1,21 +1,20 @@
 import { Link } from "wouter-preact";
 import { cl } from "../lib/cl";
 import { inputUsedIndexes } from "../lib/computeGreenTiles";
-import { getStats, type GameResult } from "../lib/storage";
+import { type GameResult } from "../lib/storage";
 import { ScoreDistribution } from "./ScoreDistribution";
 
 interface Props {
   day: number;
   puzzle: string;
   gameResult: GameResult;
+  streaks: { daysPlayed: number; currentStreak: number; bestStreak: number } | null;
   onPlayAgain: () => void;
 }
 
-export function ResultsPage({ day, puzzle, gameResult, onPlayAgain }: Props) {
-  const { daysPlayed, currentStreak, bestStreak } = getStats();
-
+export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props) {
   let tempPuzzle = puzzle;
-  const wordsTiles = gameResult.words.map((word) => {
+  const wordsTiles = gameResult.lastPlay.map((word) => {
     const indexes = inputUsedIndexes(tempPuzzle, word);
     tempPuzzle = tempPuzzle.slice(indexes.length);
     const tiles = [];
@@ -29,18 +28,22 @@ export function ResultsPage({ day, puzzle, gameResult, onPlayAgain }: Props) {
     <div class="max-w-screen-sm mx-auto mt-20 p-4 bg-background flex flex-col gap-8">
       <div class="grid grid-cols-3 gap-2 text-center">
         <div class="font-bold text-xl text-center col-span-3">Congratulations!</div>
-        <div>
-          <div class="font-bold text-2xl">{daysPlayed}</div>
-          <div class="text-sm text-gray-500">Days Played</div>
-        </div>
-        <div>
-          <div class="font-bold text-2xl">{currentStreak}</div>
-          <div class="text-sm text-gray-500">Current Streak</div>
-        </div>
-        <div>
-          <div class="font-bold text-2xl">{bestStreak}</div>
-          <div class="text-sm text-gray-500">Best Streak</div>
-        </div>
+        {streaks && (
+          <>
+            <div>
+              <div class="font-bold text-2xl">{streaks.daysPlayed}</div>
+              <div class="text-sm text-gray-500">Days Played</div>
+            </div>
+            <div>
+              <div class="font-bold text-2xl">{streaks.currentStreak}</div>
+              <div class="text-sm text-gray-500">Current Streak</div>
+            </div>
+            <div>
+              <div class="font-bold text-2xl">{streaks.bestStreak}</div>
+              <div class="text-sm text-gray-500">Best Streak</div>
+            </div>
+          </>
+        )}
         <Link
           href="/"
           class="justify-self-center bg-orange-100 @hover:bg-orange-200 !active:bg-orange-300 rounded-xl px-3 py-2 font-semibold"
@@ -79,7 +82,13 @@ export function ResultsPage({ day, puzzle, gameResult, onPlayAgain }: Props) {
           </svg>
         </button>
       </div>
-      <ScoreDistribution day={day} playerScore={wordsTiles.length} plays={gameResult.plays} />
+      <ScoreDistribution
+        day={day}
+        firstScore={gameResult.firstScore}
+        bestScore={gameResult.bestScore}
+        lastScore={gameResult.lastPlay.length}
+        plays={gameResult.plays}
+      />
       <details class="mt-4 group">
         <summary class="font-semibold cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex justify-between items-center">
           Your moves
@@ -87,7 +96,7 @@ export function ResultsPage({ day, puzzle, gameResult, onPlayAgain }: Props) {
         </summary>
         <ul class="flex flex-col gap-2 list-decimal pl-4 mt-4">
           {wordsTiles.map((tiles, i) => (
-            <li key={i} class="">
+            <li key={i}>
               <div class="font-bold uppercase">
                 {tiles.map(({ letter, green }, j) => (
                   <div

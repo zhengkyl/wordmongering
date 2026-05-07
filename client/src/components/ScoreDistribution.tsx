@@ -3,11 +3,13 @@ import { cl } from "../lib/cl";
 
 interface Props {
   day: number;
-  playerScore: number;
+  firstScore: number;
+  bestScore: number;
+  lastScore: number;
   plays: number;
 }
 
-export function ScoreDistribution({ day, playerScore, plays }: Props) {
+export function ScoreDistribution({ day, firstScore, bestScore, lastScore, plays }: Props) {
   const [globalData, setGlobalData] = useState<{
     allPlays: Record<number, number>;
     firstPlays: Record<number, number>;
@@ -28,7 +30,7 @@ export function ScoreDistribution({ day, playerScore, plays }: Props) {
   return (
     <div class="flex flex-col gap-4 mt-4">
       <div class="flex items-center justify-between">
-        <div class="font-semibold">Score distribution</div>
+        <div class="font-semibold">Everyone's scores</div>
         <div class="flex text-xs">
           <button
             class={cl([
@@ -46,13 +48,14 @@ export function ScoreDistribution({ day, playerScore, plays }: Props) {
             ])}
             onClick={() => setFilterFirst(false)}
           >
-            All plays
+            All
           </button>
         </div>
       </div>
       {globalData ? (
         <ScoreChart
-          playerScore={playerScore}
+          primaryScore={filterFirst ? firstScore : lastScore}
+          secondaryScore={!filterFirst && lastScore !== bestScore ? bestScore : undefined}
           data={filterFirst ? globalData.firstPlays : globalData.allPlays}
         />
       ) : errorMsg ? (
@@ -65,11 +68,12 @@ export function ScoreDistribution({ day, playerScore, plays }: Props) {
 }
 
 interface ChartProps {
-  playerScore: number;
+  primaryScore: number;
+  secondaryScore: number | undefined;
   data: Record<number, number>;
 }
 
-function ScoreChart({ data, playerScore }: ChartProps) {
+function ScoreChart({ data, primaryScore, secondaryScore }: ChartProps) {
   const keys = Object.keys(data).map(Number);
   const max = keys.reduce((max, curr) => (curr > max ? curr : max), 0);
   const min = keys.reduce((min, curr) => (curr < min ? curr : min), 999);
@@ -77,26 +81,30 @@ function ScoreChart({ data, playerScore }: ChartProps) {
 
   const maxCount = Object.values(data).reduce((max, curr) => (curr > max ? curr : max), 0);
 
-  return Array.from({ length: bars }, (_, i) => {
-    const words = i + min;
-    const count = data[words] ?? 0;
-    const isPlayer = words === playerScore;
-    const pct = Math.round((count / maxCount) * 100);
-    return (
-      <div key={i} class="flex items-center text-sm">
-        <div class="-ml-4 w-8 pr-2 text-right font-mono text-gray-500">{words}</div>
-        <div class="flex-1">
-          <div
-            class={cl([
-              "h-6 flex items-center justify-end px-2 font-bold text-white text-xs min-w-8",
-              isPlayer ? "bg-green-500" : "bg-stone-300",
-            ])}
-            style={{ width: `${pct}%` }}
-          >
-            {count}
-          </div>
-        </div>
-      </div>
-    );
-  });
+  return (
+    <ol start={min} class="flex flex-col gap-2 text-sm list-decimal pl-4">
+      {Array.from({ length: bars }, (_, i) => {
+        const words = i + min;
+        const count = data[words] ?? 0;
+        const isPrimary = words === primaryScore;
+        const isSecondary = words === secondaryScore;
+        const pct = Math.round((count / maxCount) * 100);
+        return (
+          <li key={i}>
+            <div
+              class={cl([
+                "h-6 px-2 font-bold text-white text-xs min-w-fit flex items-center justify-end",
+                isPrimary ? "bg-green-500" : isSecondary ? "bg-blue-400" : "bg-stone-400",
+              ])}
+              style={{ width: `${pct}%` }}
+            >
+              {isPrimary && <span class="mr-auto">You</span>}
+              {isSecondary && <span class="mr-auto">You (best)</span>}
+              {count}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
 }

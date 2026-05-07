@@ -5,52 +5,85 @@ type AllResults = Record<string, GameResult>;
 type PlayRecord = Record<number, [number, number]>;
 
 const RESULTS_KEY = "wm_results";
+const RESULTS_VERSION = 1;
 const STREAKS_KEY = "wm_streaks";
+const STREAKS_VERSION = 1;
 
-export type GameResult = { words: string[]; plays: number };
+export type GameResult = {
+  firstScore: number;
+  bestScore: number;
+  lastPlay: string[];
+  plays: number;
+};
 
 function getAllResults(): AllResults {
   const raw = localStorage.getItem(RESULTS_KEY);
   if (!raw) return {};
-  return JSON.parse(raw) as AllResults;
+  const parsed = JSON.parse(raw);
+  if (!("_v" in parsed)) return {};
+  return (parsed as { _v: number; data: AllResults }).data;
+}
+
+function saveAllResults(data: AllResults) {
+  localStorage.setItem(RESULTS_KEY, JSON.stringify({ _v: RESULTS_VERSION, data }));
 }
 
 export function getDayResults(day: number): GameResult | null {
   return getAllResults()[day] ?? null;
 }
 
-export function updateDayResults(day: number, words: string[]) {
+export function updateDayResults(day: number, words: string[]): GameResult {
   const all = getAllResults();
-  const plays = (all[day]?.plays ?? 0) + 1;
-  all[day] = {
-    words,
+  const existing = all[day] ?? null;
+  const plays = (existing?.plays ?? 0) + 1;
+  const gameResult: GameResult = {
+    firstScore: existing ? existing.firstScore : words.length,
+    bestScore: existing && existing.bestScore <= words.length ? existing.bestScore : words.length,
+    lastPlay: words,
     plays,
   };
-  localStorage.setItem(RESULTS_KEY, JSON.stringify(all));
-  return { plays };
+  all[day] = gameResult;
+  saveAllResults(all);
+  return gameResult;
 }
 
-export function updateStreak(day: number, time: [number, number]): void {
+function getPlayRecord(): PlayRecord {
   const raw = localStorage.getItem(STREAKS_KEY);
-  const record: PlayRecord = raw ? (JSON.parse(raw) as PlayRecord) : {};
-  if (day in record) return;
+  if (!raw) return {};
+  const parsed = JSON.parse(raw);
+  if (!("_v" in parsed)) return {};
+  return (parsed as { _v: number; data: PlayRecord }).data;
+}
+
+function savePlayRecord(data: PlayRecord) {
+  localStorage.setItem(STREAKS_KEY, JSON.stringify({ _v: STREAKS_VERSION, data }));
+}
+
+export function updateStreak(
+  day: number,
+  time: [number, number],
+): { daysPlayed: number; currentStreak: number; bestStreak: number } | null {
+  const record = getPlayRecord();
+  if (day in record) return null;
   record[day] = time;
-  localStorage.setItem(STREAKS_KEY, JSON.stringify(record));
+  savePlayRecord(record);
+  return getStats(record);
 }
 
 export function getCompletedDaySet(): Set<number> {
   return new Set(Object.keys(getAllResults()).map(Number));
 }
 
-export function getStats(): {
+export function getStats(record?: PlayRecord): {
   daysPlayed: number;
   currentStreak: number;
   bestStreak: number;
 } {
-  const raw = localStorage.getItem(STREAKS_KEY);
-  if (!raw) return { daysPlayed: 0, currentStreak: 0, bestStreak: 0 };
+  if (!record) {
+    record = getPlayRecord();
+  }
 
-  const days = Object.keys(JSON.parse(raw) as PlayRecord)
+  const days = Object.keys(record)
     .map(Number)
     .sort((a, b) => a - b);
 

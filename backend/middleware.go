@@ -51,15 +51,15 @@ type rateLimiter struct {
 }
 
 func (rl *rateLimiter) allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
 	if time.Since(rl.prevReset) >= rl.window {
-		rl.mu.Lock()
 		clear(rl.counts)
-		rl.mu.Unlock()
-		return true
+		rl.prevReset = time.Now()
 	}
 
-	reqs, ok := rl.counts[ip]
-	if ok && reqs >= rl.limit {
+	if rl.counts[ip] >= rl.limit {
 		return false
 	}
 

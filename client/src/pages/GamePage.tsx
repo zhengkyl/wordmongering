@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { useParams } from "wouter-preact";
 import { Game } from "../components/Game";
 import { PageLayout } from "../components/PageLayout";
-import { ResultsPage } from "../components/Results";
+import { Results } from "../components/Results";
 import { getDayNumber, LOCAL_WM_EPOCH, MS_PER_DAY } from "../lib/daily";
 import { getPlayerHint } from "../lib/playerHint";
 import { fetchPuzzle } from "../lib/puzzles";
@@ -36,15 +36,22 @@ function GameLoader({ day }: { day: number }) {
   return <GameOrResults day={day} puzzle={puzzle} />;
 }
 
+type Streaks = { daysPlayed: number; currentStreak: number; bestStreak: number };
+type SessionResult = { gameResult: GameResult; streaks: Streaks | null };
+
 function GameOrResults({ day, puzzle }: { day: number; puzzle: string }) {
-  const [results, setResults] = useState<GameResult | null>(getDayResults(day));
+  const existingResult = getDayResults(day);
+  const [results, setResults] = useState<SessionResult | null>(
+    existingResult ? { gameResult: existingResult, streaks: null } : null,
+  );
 
   if (results) {
     return (
-      <ResultsPage
+      <Results
         day={day}
         puzzle={puzzle}
-        gameResult={results}
+        gameResult={results.gameResult}
+        streaks={results.streaks}
         onPlayAgain={() => setResults(null)}
       />
     );
@@ -55,7 +62,7 @@ function GameOrResults({ day, puzzle }: { day: number; puzzle: string }) {
       day={day}
       puzzle={puzzle}
       onComplete={(words) => {
-        const { plays } = updateDayResults(day, words);
+        const gameResult = updateDayResults(day, words);
         fetch(`/api/dailies/${day}/results`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -65,18 +72,20 @@ function GameOrResults({ day, puzzle }: { day: number; puzzle: string }) {
             words,
           }),
         });
-        // TODO Game errors if not switched immediately after onComplete
-        // fetch isn't called in time for data to show in result charts
-        setResults({ words, plays });
 
         const finishDay = getDayNumber();
         const now = new Date();
 
+        let streaks: Streaks | null = null;
         if (finishDay === day) {
-          updateStreak(day, [now.getHours(), now.getMinutes()]);
+          streaks = updateStreak(day, [now.getHours(), now.getMinutes()]);
         } else if (finishDay === day + 1 && now.getHours() < 3) {
-          updateStreak(day, [24 + now.getHours(), now.getMinutes()]);
+          streaks = updateStreak(day, [24 + now.getHours(), now.getMinutes()]);
         }
+
+        // TODO Game errors if not switched immediately after onComplete
+        // what if fetch isn't called in time for data to show in result charts
+        setResults({ gameResult, streaks });
       }}
     />
   );

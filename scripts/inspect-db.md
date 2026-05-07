@@ -13,6 +13,4 @@ scp bob@42.42.42.42:/tmp/copy.db data/data.db
 
 # From remote, cleanup
 rm /tmp/copy.db
-
-nr db:studio
 ```
