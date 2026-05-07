@@ -62,7 +62,6 @@ function GameOrResults({ day, puzzle }: { day: number; puzzle: string }) {
       day={day}
       puzzle={puzzle}
       onComplete={(words) => {
-        const gameResult = updateDayResults(day, words);
         fetch(`/api/dailies/${day}/results`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -73,19 +72,13 @@ function GameOrResults({ day, puzzle }: { day: number; puzzle: string }) {
           }),
         });
 
-        const finishDay = getDayNumber();
-        const now = new Date();
+        const gameResult = updateDayResults(day, words);
+        const streaks = updateStreak(day);
 
-        let streaks: Streaks | null = null;
-        if (finishDay === day) {
-          streaks = updateStreak(day, [now.getHours(), now.getMinutes()]);
-        } else if (finishDay === day + 1 && now.getHours() < 3) {
-          streaks = updateStreak(day, [24 + now.getHours(), now.getMinutes()]);
-        }
-
-        // TODO Game errors if not switched immediately after onComplete
-        // what if fetch isn't called in time for data to show in result charts
-        setResults({ gameResult, streaks });
+        // hacky, wait until post to show results
+        setTimeout(() => {
+          setResults({ gameResult, streaks });
+        }, 300);
       }}
     />
   );

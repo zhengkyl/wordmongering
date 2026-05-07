@@ -62,8 +62,7 @@ function buildMonthGroups(maxDay: number, completed: Set<number>): MonthGroup[] 
 }
 
 export function ArchivePage() {
-  const today = getDayNumber();
-  const maxDay = today;
+  const maxDay = getDayNumber();
   const completed = getCompletedDaySet();
   const months = buildMonthGroups(maxDay, completed);
 
@@ -104,7 +103,10 @@ function MonthCalendar({ year, month, firstDayOfWeek, daysInMonth, puzzleDays }:
           const info = puzzleDays.get(dayOfMonth);
           if (!info) {
             return (
-              <div key={dayOfMonth} class="aspect-square flex items-center justify-center text-xs text-gray-200">
+              <div
+                key={dayOfMonth}
+                class="aspect-square flex items-center justify-center text-xs text-gray-200"
+              >
                 {dayOfMonth}
               </div>
             );

@@ -61,8 +61,19 @@ function savePlayRecord(data: PlayRecord) {
 
 export function updateStreak(
   day: number,
-  time: [number, number],
 ): { daysPlayed: number; currentStreak: number; bestStreak: number } | null {
+  const finishDay = getDayNumber();
+  const now = new Date();
+
+  let time: [number, number];
+  if (finishDay === day) {
+    time = [now.getHours(), now.getMinutes()];
+  } else if (finishDay === day + 1 && now.getHours() < 3) {
+    time = [24 + now.getHours(), now.getMinutes()];
+  } else {
+    return null;
+  }
+
   const record = getPlayRecord();
   if (day in record) return null;
   record[day] = time;
