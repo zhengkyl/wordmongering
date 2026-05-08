@@ -83,7 +83,7 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
         lastScore={gameResult.lastPlay.length}
         plays={gameResult.plays}
       />
-      <details class="group rounded-xl bg-orange-100" open>
+      <details class="group rounded-xl bg-orange-100 mb-4" open>
         <summary class="font-semibold cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex justify-between items-center p-4">
           Your moves
           <span class="inline-block transition-transform group-open:-rotate-90">{"<"}</span>

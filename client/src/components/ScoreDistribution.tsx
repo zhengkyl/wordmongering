@@ -28,7 +28,7 @@ export function ScoreDistribution({ day, firstScore, bestScore, lastScore, plays
   const [filterFirst, setFilterFirst] = useState(plays === 1);
 
   return (
-    <div class="flex flex-col gap-4 p-4 rounded-xl bg-orange-100 min-h-40">
+    <div class="flex flex-col gap-4 p-4 rounded-xl bg-orange-100 min-h-24">
       <div class="flex items-center justify-between">
         <div class="font-semibold">Everyone's scores</div>
         <div class="flex text-xs">
