@@ -1,5 +1,6 @@
 import { Link } from "wouter-preact";
 import { PageLayout } from "../components/PageLayout";
+import { cl } from "../lib/cl";
 import { LOCAL_WM_EPOCH, MS_PER_DAY, getDayNumber } from "../lib/daily";
 import { getCompletedDaySet } from "../lib/storage";
 
@@ -68,18 +69,11 @@ export function ArchivePage() {
 
   return (
     <PageLayout>
-      <div class="max-w-screen-sm m-auto p-4 flex flex-col gap-8">
-        <div class="flex items-center gap-4 pt-2">
-          <Link href="/" class="underline text-sm text-gray-500">
-            ← Back
-          </Link>
-          <h1 class="font-bold text-2xl">Archive</h1>
-        </div>
-        {months.length === 0 ? (
-          <p class="text-sm text-gray-500">No puzzles yet.</p>
-        ) : (
-          months.map((mg) => <MonthCalendar key={`${mg.year}-${mg.month}`} {...mg} />)
-        )}
+      <h1 class="mt-16 font-bold text-2xl text-center">Archive</h1>
+      <div class="p-4 flex flex-col gap-8 bg-orange-100 rounded-xl">
+        {months.map((mg) => (
+          <MonthCalendar key={`${mg.year}-${mg.month}`} {...mg} />
+        ))}
       </div>
     </PageLayout>
   );
@@ -87,13 +81,13 @@ export function ArchivePage() {
 
 function MonthCalendar({ year, month, firstDayOfWeek, daysInMonth, puzzleDays }: MonthGroup) {
   return (
-    <div>
-      <h2 class="font-semibold text-lg mb-3">
+    <div class="text-center">
+      <h2 class="font-semibold text-lg">
         {MONTH_NAMES[month]} {year}
       </h2>
-      <div class="grid grid-cols-7 gap-1 text-center">
+      <div class="bg-background grid grid-cols-7 font-bold">
         {DAY_HEADERS.map((h) => (
-          <div class="text-xs font-bold text-gray-400 pb-1">{h}</div>
+          <div class="text-xs font-bold text-gray-400 p-1">{h}</div>
         ))}
         {Array.from({ length: firstDayOfWeek }, (_, i) => (
           <div key={`pad-${i}`} class="aspect-square" />
@@ -105,32 +99,24 @@ function MonthCalendar({ year, month, firstDayOfWeek, daysInMonth, puzzleDays }:
             return (
               <div
                 key={dayOfMonth}
-                class="aspect-square flex items-center justify-center text-xs text-gray-200"
+                class="w-10 aspect-square flex items-center justify-center text-gray-200 select-none"
+                aria-hidden
               >
                 {dayOfMonth}
               </div>
             );
           }
-          if (info.completed) {
-            return (
-              <Link
-                key={dayOfMonth}
-                href={`/daily/${info.puzzleDay}`}
-                class="aspect-square flex flex-col items-center justify-center rounded bg-green-100 text-green-700"
-              >
-                <span class="font-bold text-base leading-none">#{info.puzzleDay}</span>
-                <span class="text-xs mt-0.5 opacity-60">{dayOfMonth}</span>
-              </Link>
-            );
-          }
+
           return (
             <Link
               key={dayOfMonth}
               href={`/daily/${info.puzzleDay}`}
-              class="aspect-square flex flex-col items-center justify-center rounded"
+              class={cl([
+                "w-10 aspect-square flex items-center justify-center @hover:bg-stone-200",
+                info.completed && " bg-green-100 text-green-700",
+              ])}
             >
-              <span class="font-bold text-base leading-none">#{info.puzzleDay}</span>
-              <span class="text-xs mt-0.5 text-gray-400">{dayOfMonth}</span>
+              {dayOfMonth}
             </Link>
           );
         })}

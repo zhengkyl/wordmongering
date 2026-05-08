@@ -28,24 +28,18 @@ export function ScoreDistribution({ day, firstScore, bestScore, lastScore, plays
   const [filterFirst, setFilterFirst] = useState(plays === 1);
 
   return (
-    <div class="flex flex-col gap-4 mt-4">
+    <div class="flex flex-col gap-4 p-4 rounded-xl bg-orange-100 min-h-40">
       <div class="flex items-center justify-between">
         <div class="font-semibold">Everyone's scores</div>
         <div class="flex text-xs">
           <button
-            class={cl([
-              "px-2 py-1 rounded-lg font-semibold",
-              filterFirst && "bg-orange-200 @hover:bg-orange-300 !active:bg-orange-400",
-            ])}
+            class={cl(["btn-tab", filterFirst && "btn-tab-active"])}
             onClick={() => setFilterFirst(true)}
           >
             First plays
           </button>
           <button
-            class={cl([
-              "px-2 py-1 rounded-lg font-semibold",
-              !filterFirst && "bg-orange-200 @hover:bg-orange-300 !active:bg-orange-400",
-            ])}
+            class={cl(["btn-tab", !filterFirst && "btn-tab-active"])}
             onClick={() => setFilterFirst(false)}
           >
             All
@@ -94,7 +88,7 @@ function ScoreChart({ data, primaryScore, secondaryScore }: ChartProps) {
             <div
               class={cl([
                 "h-6 px-2 font-bold text-white text-xs min-w-fit flex items-center justify-end",
-                isPrimary ? "bg-green-500" : isSecondary ? "bg-blue-400" : "bg-stone-400",
+                isPrimary ? "bg-green-500" : isSecondary ? "bg-orange-400" : "bg-stone-400",
               ])}
               style={{ width: `${pct}%` }}
             >

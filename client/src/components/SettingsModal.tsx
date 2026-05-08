@@ -5,8 +5,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const { daysPlayed, currentStreak, bestStreak } = getStats();
 
   return (
-    <Modal title="Settings" onClose={onClose}>
-      <div class="grid grid-cols-3 gap-2 text-center">
+    <Modal title="Stats" onClose={onClose}>
+      <div class="bg-orange-100 p-2 rounded-lg grid grid-cols-3 gap-2 text-center">
         <div>
           <div class="font-bold text-2xl">{daysPlayed}</div>
           <div class="text-sm text-gray-500">Days Played</div>
@@ -19,6 +19,11 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           <div class="font-bold text-2xl">{bestStreak}</div>
           <div class="text-sm text-gray-500">Best Streak</div>
         </div>
+      </div>
+      <div class="self-end">
+        <a href="https://github.com/zhengkyl/wordmongering" class="underline" target="_blank">
+          View source code
+        </a>
       </div>
     </Modal>
   );

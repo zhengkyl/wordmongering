@@ -6,10 +6,6 @@
 
 ## Ideas
 
-- 10 word limit
-- no repeat words
-- tutorial hint
-
 - snake
 - spiral
 - cerberus
@@ -56,7 +52,7 @@ docker compose up -d
 docker exec -it <container_id_or_name> /bin/dashboard
 ```
 
-### Node
+### From source
 
 ```sh
 git clone https://github.com/zhengkyl/wordmongering

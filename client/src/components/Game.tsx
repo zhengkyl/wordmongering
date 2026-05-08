@@ -15,23 +15,7 @@ const TILE_PX = 48;
 
 let audioCtx: AudioContext | null = null;
 
-function playPop(delayMs: number, index: number) {
-  if (!soundEnabled) return;
-  if (!audioCtx) audioCtx = new AudioContext();
-  const ctx = audioCtx;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  const t = ctx.currentTime + delayMs / 1000;
-  const base = 500 * Math.pow(2, (index * 2) / 12);
-  osc.frequency.setValueAtTime(base * 1.5, t);
-  osc.frequency.exponentialRampToValueAtTime(base * 0.15, t + 0.08);
-  gain.gain.setValueAtTime(0.25, t);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-  osc.start(t);
-  osc.stop(t + 0.12);
-}
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 type GamePhase =
   | { type: "intro"; offset: number }
@@ -69,6 +53,7 @@ export function Game({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [reportWord, setReportWord] = useState<string | null>(null);
+  const [celebrating, setCelebrating] = useState(false);
 
   useEffect(() => {
     function refocusOnType(e: KeyboardEvent) {
@@ -100,7 +85,7 @@ export function Game({
 
   const slideOffset = phase.type === "intro" || phase.type === "sliding" ? phase.offset : null;
   const poppingCount = phase.type === "popping" ? phase.count : null;
-  const isAnimating = phase.type !== "idle";
+  const isAnimating = phase.type !== "idle" || celebrating;
   const { matched, candidates } = puzzleMatchedTiles(tiles, input);
 
   let minX = 0,
@@ -135,7 +120,7 @@ export function Game({
     }, 0);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!dictLoaded || isAnimating) return;
 
     const greenCount = matched.length;
@@ -157,6 +142,13 @@ export function Game({
     const nextEnemy = tiles.slice(greenCount);
 
     usedWordsRef.current.push(word);
+
+    if (word === "wordmongering") {
+      setCelebrating(true);
+      playHorn();
+      await sleep(3200);
+      setCelebrating(false);
+    }
 
     setErrorMsg(null);
     setInput("");
@@ -192,11 +184,11 @@ export function Game({
     if (phase.type === "intro") {
       const maxOffset = Math.ceil(serpentineIndexForHeight(window.innerHeight)) + 1;
       const t = phase.offset / maxOffset;
-      return Math.round(40 + 110 * (1 - t) ** 4);
+      return Math.round(40 + 100 * (1 - t) ** 8);
     }
     if (phase.type === "sliding") {
       const t = phase.offset / phase.initialOffset;
-      return Math.round(50 + 100 * (1 - t) ** 4);
+      return Math.round(40 + 40 * (1 - t) ** 2);
     }
     return 150;
   }
@@ -205,7 +197,7 @@ export function Game({
   const cursorVisible = phase.type === "idle" && matched.length < tiles.length;
 
   return (
-    <div class="max-w-screen-sm mx-auto flex-grow-1 flex flex-col relative">
+    <>
       <div
         class="absolute left-0 right-0 text-center bottom-60vh overflow-hidden"
         style={{ animation: "fade-out 0.8s ease-out 1s forwards" }}
@@ -302,11 +294,7 @@ export function Game({
           </svg>
         )}
       </div>
-
-      <div
-        class="max-w-screen-sm px-4 opacity-0"
-        style={{ animation: "fade-in 0.8s ease-out 1.5s forwards" }}
-      >
+      <div class="opacity-0" style={{ animation: "fade-in 0.8s ease-out 1.5s forwards" }}>
         <div
           class={cl(["text-center py-4 transition-opacity", phase.type === "intro" && "opacity-0"])}
         >
@@ -337,10 +325,22 @@ export function Game({
               spellcheck={false}
             />
             <button
-              class="absolute top-2 right-2 sm:(top-3 right-3) rounded-md h-10 px-3 font-bold text-white bg-blue-500 @hover:bg-blue-600 !active:bg-blue-700"
+              class="absolute top-2 right-2 sm:(top-3 right-3) btn-orange rounded-md text-2xl h-10 px-3 font-bold"
               onClick={handleSubmit}
             >
-              PLAY
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="w-6 h-6"
+              >
+                <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+                <path d="m9 10-5 5 5 5" />
+              </svg>
             </button>
           </div>
           <div class="flex h-9 px-3 sm:px-4 py-2 gap-2 text-sm text-red-600" role="alert">
@@ -357,6 +357,83 @@ export function Game({
         </div>
       </div>
       {reportWord !== null && <ReportModal word={reportWord} onClose={() => setReportWord(null)} />}
+      {celebrating && <WordmongeringCelebration />}
+    </>
+  );
+}
+
+function playPop(delayMs: number, index: number) {
+  if (!soundEnabled) return;
+  if (!audioCtx) audioCtx = new AudioContext();
+  const ctx = audioCtx;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  const t = ctx.currentTime + delayMs / 1000;
+  const base = 500 * Math.pow(2, (index * 2) / 12);
+  osc.frequency.setValueAtTime(base * 1.5, t);
+  osc.frequency.exponentialRampToValueAtTime(base * 0.15, t + 0.08);
+  gain.gain.setValueAtTime(0.25, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  osc.start(t);
+  osc.stop(t + 0.12);
+}
+
+function playHorn() {
+  if (!soundEnabled) return;
+  if (!audioCtx) audioCtx = new AudioContext();
+  const ctx = audioCtx;
+  const t = ctx.currentTime;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(500, t);
+  filter.Q.setValueAtTime(2, t);
+
+  const masterGain = ctx.createGain();
+  masterGain.gain.setValueAtTime(0, t);
+  masterGain.gain.linearRampToValueAtTime(0.6, t + 0.1);
+  masterGain.gain.exponentialRampToValueAtTime(0.001, t + 3.2);
+  filter.connect(masterGain);
+  masterGain.connect(ctx.destination);
+
+  const osc1 = ctx.createOscillator();
+  osc1.type = "sawtooth";
+  osc1.frequency.setValueAtTime(65, t);
+  osc1.connect(filter);
+  osc1.start(t);
+  osc1.stop(t + 3.2);
+
+  const osc2 = ctx.createOscillator();
+  osc2.type = "sawtooth";
+  osc2.frequency.setValueAtTime(65, t);
+  osc2.detune.setValueAtTime(8, t);
+  osc2.connect(filter);
+  osc2.start(t);
+  osc2.stop(t + 3.2);
+
+  const osc3 = ctx.createOscillator();
+  osc3.type = "sawtooth";
+  osc3.frequency.setValueAtTime(130, t);
+  osc3.connect(filter);
+  osc3.start(t);
+  osc3.stop(t + 3.2);
+}
+
+function WordmongeringCelebration() {
+  return (
+    <div class="fixed inset-0 pointer-events-none z-50 flex items-center justify-center bg-black">
+      <div class="font-serif">
+        <div class="font-bold text-4xl sm:text-6xl text-orange-400 tracking-tight">
+          wordmongering
+        </div>
+        <div class="text-stone-500 mt-1 sm:text-lg">/ˈwərd ˌməŋ·gər·iŋ/</div>
+        <div class="mt-4 pt-4 border-t border-stone-800">
+          <span class="italic text-stone-500">n.</span>
+          <span class="text-stone-300 ml-2 sm:text-lg">Use lot words no reason</span>
+        </div>
+      </div>
     </div>
   );
 }

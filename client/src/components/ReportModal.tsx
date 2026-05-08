@@ -10,7 +10,7 @@ export function ReportModal({ word, onClose }: { word: string; onClose: () => vo
     return (
       <Modal title="Thanks!" onClose={onClose}>
         <p>Your report has been submitted!</p>
-        <button class="sketchy-md px-4 py-2 font-bold w-full" onClick={onClose}>
+        <button class="btn btn-orange" onClick={onClose}>
           Close
         </button>
       </Modal>
@@ -30,12 +30,12 @@ export function ReportModal({ word, onClose }: { word: string; onClose: () => vo
         onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
         rows={3}
       />
-      <div class="flex gap-2">
-        <button class="sketchy-md flex-1 px-4 py-2" onClick={onClose}>
+      <div class="flex justify-end gap-2">
+        <button class="btn btn-sec" onClick={onClose}>
           Cancel
         </button>
         <button
-          class="sketchy-md flex-1 px-4 py-2 bg-blue-500 text-white font-bold"
+          class="btn btn-orange font-bold"
           onClick={() => {
             fetch("/api/reports", {
               method: "POST",

@@ -17,7 +17,7 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
   const wordsTiles = gameResult.lastPlay.map((word) => {
     const indexes = inputUsedIndexes(tempPuzzle, word);
     tempPuzzle = tempPuzzle.slice(indexes.length);
-    const tiles = [];
+    const tiles: { letter: string; green: boolean }[] = [];
     for (let i = 0; i < word.length; i++) {
       tiles.push({ letter: word.charAt(i), green: indexes.includes(i) });
     }
@@ -25,9 +25,9 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
   });
 
   return (
-    <div class="max-w-screen-sm mx-auto mt-20 p-4 bg-background flex flex-col gap-8">
-      <div class="grid grid-cols-3 gap-2 text-center">
-        <div class="font-bold text-xl text-center col-span-3">Congratulations!</div>
+    <>
+      <div class="grid grid-cols-3 gap-2 text-center mt-16">
+        <div class="font-bold text-2xl col-span-3">Congratulations!</div>
         {streaks && (
           <>
             <div>
@@ -44,20 +44,14 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
             </div>
           </>
         )}
-        <Link
-          href="/"
-          class="justify-self-center bg-orange-100 @hover:bg-orange-200 !active:bg-orange-300 rounded-xl px-3 py-2 font-semibold"
-        >
+        <Link href="/" class="justify-self-center btn btn-ghost">
           Menu
         </Link>
-        <button
-          class="bg-blue-500 @hover:bg-blue-600 !active:bg-blue-700 text-white rounded-xl inline-flex justify-center items-center px-3 py-2 font-semibold"
-          onClick={onPlayAgain}
-        >
-          Play again
+        <button class="btn btn-orange" onClick={onPlayAgain}>
+          Replay
         </button>
         <button
-          class="justify-self-center inline-flex justify-center items-center rounded-xl p-2 font-semibold @hover:bg-orange-100/50 !active:bg-orange-100"
+          class="justify-self-center btn btn-ghost"
           onClick={() => {
             const turns = wordsTiles.map((tiles) =>
               tiles.map((t) => (t.green ? "🟩" : "⬜")).join(""),
@@ -89,12 +83,12 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
         lastScore={gameResult.lastPlay.length}
         plays={gameResult.plays}
       />
-      <details class="mt-4 group">
-        <summary class="font-semibold cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex justify-between items-center">
+      <details class="group rounded-xl bg-orange-100" open>
+        <summary class="font-semibold cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex justify-between items-center p-4">
           Your moves
           <span class="inline-block transition-transform group-open:-rotate-90">{"<"}</span>
         </summary>
-        <ul class="flex flex-col gap-2 list-decimal pl-4 mt-4">
+        <ul class="flex flex-col gap-2 list-decimal p-4 pt-0 pl-8">
           {wordsTiles.map((tiles, i) => (
             <li key={i}>
               <div class="font-bold uppercase">
@@ -103,7 +97,7 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
                     key={j}
                     class={cl([
                       "inline-block w-6 text-center",
-                      green ? "bg-emerald-200" : "bg-orange-100",
+                      green ? "bg-green-300" : "bg-orange-200",
                     ])}
                   >
                     <span class="vertical-middle">{letter}</span>
@@ -114,6 +108,6 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
           ))}
         </ul>
       </details>
-    </div>
+    </>
   );
 }
