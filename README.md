@@ -1,8 +1,13 @@
 # Wordmongering
 
+Try it out at [wordmongering.com](https://wordmongering.com)
+
 ![game preview](./docs/preview.png)
 
 ## Todo
+
+- make tool to make puzzles
+- improve tui
 
 ## Ideas
 
@@ -24,7 +29,7 @@
 - https://github.com/words/an-array-of-english-words
   - letterpress word list + 4 words and 7 non-words
 
-## Development
+## Develop
 
 Make sure to access development site via vite's port (probably localhost:5173). Api requests are proxied by vite to a different port.
 
