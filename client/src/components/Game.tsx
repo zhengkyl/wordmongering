@@ -77,7 +77,7 @@ export function Game({
     fetch("/dictionary.txt")
       .then((r) => r.text())
       .then((text) => {
-        dictionaryRef.current = new Set(text.split("\n"));
+        dictionaryRef.current = new Set(text.trim().split("\n"));
         setDictLoaded(true);
         console.log(`Dictionary loaded with ${dictionaryRef.current.size} words`);
       });
