@@ -1,58 +1,37 @@
 the
-be
 and
-of
-to
-in
 you
-it
 have
-to
 that
 for
-do
-he
 with
-on
 this
-we
 that
 not
 but
 they
 say
-at
 what
 his
 from
-go
-or
-by
 get
 she
-my
 can
-as
 know
-if
-me
 your
 all
 who
 about
 their
 will
-so
 would
 make
 just
-up
 think
 time
 there
 see
 her
-as
 out
 one
 come
@@ -79,7 +58,6 @@ look
 way
 more
 these
-no
 thing
 well
 because
@@ -96,7 +74,6 @@ give
 more
 new
 one
-us
 any
 those
 very
@@ -114,7 +91,6 @@ life
 why
 right
 down
-on
 try
 let
 something
@@ -127,19 +103,15 @@ through
 mean
 after
 never
-no
 world
-in
 feel
 yeah
 great
 last
 child
-oh
 over
 ask
 when
-as
 school
 state
 much
@@ -174,7 +146,6 @@ house
 show
 again
 student
-so
 seem
 might
 part
@@ -453,7 +424,6 @@ air
 force
 require
 foot
-up
 listen
 agree
 according
@@ -616,7 +586,6 @@ campaign
 ground
 election
 face
-uh
 check
 page
 fight
@@ -661,7 +630,6 @@ figure
 attention
 forget
 risk
-no
 focus
 short
 fire
@@ -702,7 +670,6 @@ well
 blood
 culture
 medical
-ok
 everybody
 top
 difficult
@@ -740,7 +707,6 @@ answer
 nature
 administration
 common
-no
 hard
 message
 song
@@ -839,7 +805,6 @@ knowledge
 rather
 hang
 sport
-tv
 loss
 argue
 left
@@ -885,7 +850,6 @@ name
 physical
 growth
 rise
-hi
 standard
 force
 sign
@@ -897,7 +861,6 @@ legal
 september
 set
 outside
-et
 strategy
 clearly
 property
@@ -1202,7 +1165,6 @@ responsibility
 chair
 internet
 october
-by
 funny
 immediately
 investment
@@ -1470,7 +1432,6 @@ present
 chief
 attitude
 start
-um
 deny
 website
 seriously
@@ -1494,7 +1455,6 @@ like
 january
 independent
 volume
-am
 lots
 front
 online
@@ -1548,7 +1508,6 @@ slowly
 advice
 reaction
 injury
-it
 ticket
 grade
 wow
@@ -1649,7 +1608,6 @@ extend
 bay
 invite
 tie
-ah
 belong
 obtain
 broad
@@ -1694,7 +1652,6 @@ emerge
 long
 lunch
 judge
-ad
 desire
 instruction
 emergency
@@ -1794,7 +1751,6 @@ engine
 adopt
 luck
 via
-pm
 panel
 hero
 circle
@@ -2040,7 +1996,6 @@ list
 era
 comment
 aid
-vs
 invest
 personally
 notion
@@ -2193,7 +2148,6 @@ online
 taste
 decline
 attract
-ha
 for
 household
 separate
@@ -2596,7 +2550,6 @@ increasing
 green
 equally
 pay
-in
 light
 implication
 fiction
@@ -2726,7 +2679,6 @@ electronic
 properly
 bureau
 wolf
-and/or
 classic
 recommendation
 exciting
@@ -3089,7 +3041,6 @@ asleep
 musician
 extraordinary
 dirt
-pc
 bell
 smell
 damage
@@ -3303,7 +3254,6 @@ pie
 decrease
 resort
 legacy
-re
 stress
 frankly
 matter
@@ -3447,7 +3397,6 @@ consciousness
 manufacturing
 announcement
 tire
-no
 makeup
 pop
 prediction
@@ -3572,11 +3521,9 @@ civilization
 warm
 corruption
 collapse
-ma'am
 greatly
 workshop
 inquiry
-cd
 admire
 exclude
 rifle
@@ -3903,7 +3850,6 @@ subtle
 rod
 top
 civilian
-t-shirt
 endure
 civilian
 basket
@@ -4721,7 +4667,6 @@ speculation
 sympathy
 tender
 inappropriate
-o'clock
 sodium
 divorce
 spring
@@ -4849,7 +4794,6 @@ chunk
 appreciation
 canvas
 punch
-short-term
 proceedings
 magical
 loyal
@@ -4866,7 +4810,6 @@ dutch
 parental
 disabled
 collector
-re-election
 disappointment
 comic
 aid
@@ -4973,7 +4916,6 @@ dancing
 petition
 viable
 breathing
-mm
 balloon
 monument
 try

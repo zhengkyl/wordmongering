@@ -1,9 +1,8 @@
 package main
 
 import (
-	_ "embed"
 	"database/sql"
-	"errors"
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,24 +20,38 @@ import (
 //go:embed top5000.txt
 var dictFile string
 
-var dict [][]rune
+// odd26 has bits set at positions 0,2,4,...,50 — the low bit of each letter's 2-bit field.
+const odd26 uint64 = 0x0005555555555555
+
+// encode packs letter counts into a uint64: letter i uses bits 2i–2i+1, capped at 3.
+func encode(word []rune) uint64 {
+	var enc uint64
+	for _, r := range word {
+		shift := (r - 'a') * 2
+		if (enc>>shift)&3 < 3 {
+			enc += 1 << shift
+		}
+	}
+	return enc
+}
+
+// covers returns true if every 2-bit letter-count field of a is >= the corresponding field of b.
+func covers(a, b uint64) bool {
+	aHi := (a >> 1) & odd26
+	aLo := a & odd26
+	bHi := (b >> 1) & odd26
+	bLo := b & odd26
+	gtHi := aHi &^ bHi
+	eqHi := ^(aHi ^ bHi) & odd26
+	geLo := (aLo | ^bLo) & odd26
+	return (gtHi|(eqHi&geLo))&odd26 == odd26
+}
+
+var dictEnc []uint64
 
 func init() {
 	for _, line := range strings.Split(strings.TrimSpace(dictFile), "\n") {
-		word := strings.TrimSpace(line)
-		if word == "" {
-			continue
-		}
-		valid := true
-		for _, r := range word {
-			if !unicode.IsLetter(r) || !unicode.IsLower(r) {
-				valid = false
-				break
-			}
-		}
-		if valid {
-			dict = append(dict, []rune(word))
-		}
+		dictEnc = append(dictEnc, encode([]rune(line)))
 	}
 }
 
@@ -118,90 +131,60 @@ func savePuzzle(db *sql.DB, day int, pz string) tea.Cmd {
 	}
 }
 
-// matchedCount returns how many tiles from the front of puzzle are covered by word.
-func matchedCount(puzzle, word []rune) int {
-	var used []int
-	for _, pc := range puzzle {
-		found := false
-		for wi, wc := range word {
-			if wc != pc {
-				continue
-			}
-			inUsed := false
-			for _, u := range used {
-				if u == wi {
-					inUsed = true
-					break
-				}
-			}
-			if inUsed {
-				continue
-			}
-			used = append(used, wi)
-			found = true
-			break
+// matchedCount returns how many tiles from the front of remaining are covered by wordEnc.
+func matchedCount(remaining []rune, wordEnc uint64) int {
+	var prefixEnc uint64
+	for i, r := range remaining {
+		shift := (r - 'a') * 2
+		if (prefixEnc>>shift)&3 < 3 {
+			prefixEnc += 1 << shift
+		} else {
+			return i
 		}
-		if !found {
-			break
+		if !covers(wordEnc, prefixEnc) {
+			return i
 		}
 	}
-	return len(used)
+	return len(remaining)
 }
 
 const (
-	maxWords    = 13
-	maxHistCount = 1_000_000
+	maxWords     = 15
+	maxHistCount = 10_000_000
 )
-
-// solve returns hist where hist[n] = # of ways to complete remaining in exactly n words (1–13).
-func solve(remaining []rune, memo map[string][maxWords + 1]int) [maxWords + 1]int {
-	if len(remaining) == 0 {
-		return [maxWords + 1]int{1}
-	}
-	key := string(remaining)
-	if cached, ok := memo[key]; ok {
-		return cached
-	}
-	var result [maxWords + 1]int
-	for _, word := range dict {
-		n := matchedCount(remaining, word)
-		if n < 2 {
-			continue
-		}
-		sub := solve(remaining[n:], memo)
-		for i := 0; i < maxWords; i++ {
-			result[i+1] += sub[i]
-			if result[i+1] > maxHistCount {
-				result[i+1] = maxHistCount
-			}
-		}
-	}
-	memo[key] = result
-	return result
-}
 
 func computeHistogram(pz string) tea.Cmd {
 	return func() tea.Msg {
-		memo := map[string][maxWords + 1]int{}
-		hist := solve([]rune(pz), memo)
-		return histogramMsg(hist)
-	}
-}
+		puzzle := []rune(pz)
+		N := len(puzzle)
+		ways := make([][maxWords + 1]int, N+1)
+		ways[0][0] = 1
 
-func onlyLowerAlpha(s string) error {
-	for _, r := range s {
-		if !unicode.IsLetter(r) || !unicode.IsLower(r) {
-			return errors.New("only lowercase letters allowed")
+		for i := range N {
+			puz := puzzle[i:]
+
+			for _, wordEnc := range dictEnc {
+				n := matchedCount(puz, wordEnc)
+				if n < 1 {
+					continue
+				}
+				for k := range maxWords {
+					ways[i+n][k+1] += ways[i][k]
+					if ways[i+n][k+1] > maxHistCount {
+						ways[i+n][k+1] = maxHistCount
+					}
+				}
+			}
 		}
+
+		return histogramMsg(ways[N])
 	}
-	return nil
 }
 
 func newModel(db *sql.DB) model {
 	ti := textinput.New()
 	ti.Placeholder = "puzzle string"
 	ti.CharLimit = 256
-	ti.Validate = onlyLowerAlpha
 
 	return model{db: db, view: viewList, input: ti, editDay: -1}
 }
@@ -288,6 +271,11 @@ func (m model) updateEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.input.Blur()
 		return m, savePuzzle(m.db, m.editDay, val)
 	}
+	runes := []rune(msg.String())
+	if len(runes) == 1 && (!unicode.IsLetter(runes[0]) || !unicode.IsLower(runes[0])) {
+		return m, nil
+	}
+
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	return m, cmd
@@ -367,7 +355,7 @@ func (m model) viewResult() string {
 	}
 	s := titleStyle.Render(fmt.Sprintf("%q (%s)", m.resultPuzzle, dayStr)) + "\n\n"
 
-	s += dimStyle.Render(fmt.Sprintf("dict: %d words", len(dict))) + "\n\n"
+	s += dimStyle.Render(fmt.Sprintf("dict: %d words", len(dictEnc))) + "\n\n"
 
 	if m.histogram == nil {
 		s += dimStyle.Render("Computing...") + "\n"
