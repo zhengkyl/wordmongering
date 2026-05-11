@@ -20,7 +20,7 @@ Try it out at [wordmongering.com](https://wordmongering.com)
 
 `dictionary.txt` is based on the [Letterpress word list](https://github.com/lorenbrichter/Words) (CC0). Changes after 7a08f2f are my own.
 
-`top5000.txt` is from [www.wordfrequency.info](https://www.wordfrequency.info). Top lemmas from the Corpus of Contemporary American English (COCA)
+`super25k.txt` is a semi-hand curated list of words that have a letter superset of popular words from https://www.wordfrequency.info and https://github.com/dolph/dictionary
 
 ### Other word lists
 
@@ -54,7 +54,7 @@ curl -O https://raw.githubusercontent.com/zhengkyl/wordmongering/refs/heads/auth
 docker compose up -d
 
 # Open admin tui
-docker exec -it <container_id_or_name> /bin/dashboard
+docker exec -it <container_id_or_name> dash
 ```
 
 ### From source

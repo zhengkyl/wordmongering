@@ -25,3 +25,5 @@ bin
 *.sw?
 
 *.env
+
+gitignore
