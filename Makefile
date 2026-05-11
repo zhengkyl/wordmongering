@@ -11,18 +11,18 @@ dev:
 	trap 'kill %1' EXIT; cd client && PORT=$(PORT) pnpm dev --port $(DEV_PORT) --host & cd backend && PORT=$(PORT) go run .
 
 dev-dash:
-	cd backend && go run cmd/dashboard/dashboard.go
+	ROOT=$(CURDIR) DEBUG=1 cd backend && go run ./cmd/dash
 
 build:
 	cd client && pnpm build
 	cd backend && go build -o ../bin/server .
-	cd backend && go build -o ../bin/dashboard ./cmd/dashboard
+	cd backend && go build -o ../bin/dash ./cmd/dash
 
 start:
-	ROOT=$(CURDIR) ./bin/server
+	./bin/server
 
 start-dash:
-	ROOT=$(CURDIR) ./bin/dashboard
+	./bin/dash
 
 addword:
 	echo "$(w)" | sort -mu - client/public/dictionary.txt -o client/public/dictionary.txt
