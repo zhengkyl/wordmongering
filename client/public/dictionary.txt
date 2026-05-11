@@ -3754,6 +3754,8 @@ afraid
 afreet
 afreets
 afresh
+africa
+african
 afrit
 afrits
 afro
@@ -6746,6 +6748,8 @@ amerciable
 amerciament
 amerciaments
 amercing
+america
+american
 americium
 americiums
 ames
@@ -8844,6 +8848,8 @@ antar
 antara
 antaras
 antarctic
+antarctica
+antarctican
 antars
 antarthritic
 antarthritics
@@ -11243,6 +11249,7 @@ apricock
 apricocks
 apricot
 apricots
+april
 apriorism
 apriorisms
 apriorist
@@ -13071,8 +13078,10 @@ ashtangas
 ashtray
 ashtrays
 ashy
+asia
 asiago
 asiagos
+asian
 aside
 asides
 asinico
@@ -14891,6 +14900,8 @@ austerities
 austerity
 austral
 australes
+australia
+australian
 australis
 australite
 australites
@@ -57369,6 +57380,7 @@ decelerometer
 decelerometers
 deceleron
 decelerons
+december
 decemvir
 decemviral
 decemvirate
@@ -80596,6 +80608,8 @@ euromarket
 euromarkets
 euronote
 euronotes
+europe
+european
 europhile
 europhiles
 europhilia
@@ -84969,6 +84983,7 @@ febrifuges
 febrile
 febrilities
 febrility
+february
 fecal
 feces
 fecht
@@ -92002,6 +92017,7 @@ frictionally
 frictionless
 frictionlessly
 frictions
+friday
 fridge
 fridged
 fridges
@@ -123476,6 +123492,7 @@ jantier
 janties
 jantiest
 janty
+january
 jap
 japan
 japanise
@@ -125001,6 +125018,7 @@ juliennes
 julienning
 juliet
 juliets
+july
 jumar
 jumared
 jumaring
@@ -125074,6 +125092,7 @@ juncture
 junctures
 juncus
 juncuses
+june
 juneating
 juneatings
 jungle
@@ -125139,6 +125158,7 @@ jupati
 jupatis
 jupe
 jupes
+jupiter
 jupon
 jupons
 jura
@@ -147524,6 +147544,7 @@ mondain
 mondaine
 mondaines
 mondains
+monday
 monde
 mondegreen
 mondegreens
@@ -153633,6 +153654,7 @@ nepotist
 nepotistic
 nepotists
 neps
+neptune
 neptunium
 neptuniums
 neral
@@ -159151,6 +159173,8 @@ oceanauts
 oceanfront
 oceanfronts
 oceangoing
+oceania
+oceanian
 oceanic
 oceanid
 oceanides
@@ -159311,6 +159335,7 @@ octillionths
 octingenaries
 octingenary
 octingentenary
+october
 octocentenaries
 octocentenary
 octodecillion
@@ -179970,6 +179995,7 @@ pluteal
 plutei
 pluteus
 pluteuses
+pluto
 plutocracies
 plutocracy
 plutocrat
@@ -209726,6 +209752,8 @@ saturation
 saturations
 saturator
 saturators
+saturday
+saturn
 saturnalia
 saturnalian
 saturnalianly
@@ -214731,6 +214759,7 @@ septate
 septation
 septations
 septavalent
+september
 septemfid
 septemvir
 septemvirate
@@ -234934,6 +234963,7 @@ sundae
 sundaes
 sundari
 sundaris
+sunday
 sundeck
 sundecks
 sunder
@@ -244824,6 +244854,7 @@ thurify
 thurifying
 thurl
 thurls
+thursday
 thus
 thuses
 thusly
@@ -251507,6 +251538,7 @@ tucutuco
 tucutucos
 tucutucu
 tucutucus
+tuesday
 tufa
 tufaceous
 tufas
@@ -261702,6 +261734,7 @@ uranometry
 uranoplasties
 uranoplasty
 uranous
+uranus
 uranyl
 uranylic
 uranyls
@@ -268657,6 +268690,7 @@ wedgings
 wedgy
 wedlock
 wedlocks
+wednesday
 weds
 wee
 weed
