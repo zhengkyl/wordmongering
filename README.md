@@ -4,10 +4,10 @@ Try it out at [wordmongering.com](https://wordmongering.com)
 
 ![game preview](./docs/preview.png)
 
-## Todo
+## TODO
 
-- make tool to make puzzles
 - improve tui
+- improve everything else
 
 ## Ideas
 
@@ -20,7 +20,10 @@ Try it out at [wordmongering.com](https://wordmongering.com)
 
 `dictionary.txt` is based on the [Letterpress word list](https://github.com/lorenbrichter/Words) (CC0). Changes after 7a08f2f are my own.
 
-`super25k.txt` is a semi-hand curated list of words that have a letter superset of popular words from https://www.wordfrequency.info and https://github.com/dolph/dictionary
+I am working on adding common proper nouns and proper adjectives.
+Also trying to reduce bad entries. It's ~60% garbage, but differenting 170k words between those last used in 1543 by a Scottish hermit and obscure terminology used everyday by microbiologists is tedious. Goal is for `dictionary.txt` to be 1.4MB (~500kB gzipped), currently 2.8MB (~900kB gzipped).
+
+`super25k.txt` is a semi-hand curated list of words that have a letter superset of popular words from https://www.wordfrequency.info and https://github.com/dolph/dictionary. These are words a native speaker can reasonably be expected to know and represent optimal plays (i.e, any other reasonable word is a letter subset of some word in this list).
 
 ### Other word lists
 

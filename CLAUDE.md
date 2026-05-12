@@ -1,5 +1,7 @@
 ## Code style
 
+- Remember! Do not run build or type checking commands.
+
 - Do not run build or type checking commands.
 - Preact: use `class` not `className`; `onInput` not `onChange`
 - UnoCSS: ALWAYS group variants e.g. `md:(one two three)`
@@ -9,4 +11,5 @@
 - Do not run build or type checking commands. The user has a dev server running and can check manually.
 - The user may make changes to the code as you work. If the change is not simple formatting, assume it is an intentional change by the user.
 - Do not run build or type checking commands.
-- Use `python3` for python scripts.
+- Use `uv` and/or `python3`
+- Do not run build or type checking commands.
