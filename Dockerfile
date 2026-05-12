@@ -13,13 +13,13 @@ COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend .
 RUN go build -ldflags='-extldflags "-static"' -o /bin/server . && \
-    go build -ldflags='-extldflags "-static"' -o /bin/dashboard ./cmd/dashboard
+    go build -ldflags='-extldflags "-static"' -o /bin/dash ./cmd/dash
 
 FROM alpine:3.20
 RUN apk add --no-cache sqlite
 WORKDIR /app
 COPY --from=go-builder /bin/server /bin/server
-COPY --from=go-builder /bin/dashboard /bin/dashboard
+COPY --from=go-builder /bin/dash /bin/dash
 COPY --from=client-builder /app/dist ./client/dist
 ARG PORT=2704
 ENV PORT=$PORT

@@ -18,19 +18,13 @@ Try it out at [wordmongering.com](https://wordmongering.com)
 
 ## Dictionary
 
-`dictionary.txt` is based on the [Letterpress word list](https://github.com/lorenbrichter/Words) (CC0). Changes after 7a08f2f are my own.
+`dictionary.txt` is based on the [Letterpress word list](https://github.com/lorenbrichter/Words). Changes after 7a08f2f are my own.
 
-I am working on adding common proper nouns and proper adjectives.
-Also trying to reduce bad entries. It's ~60% garbage, but differenting 170k words between those last used in 1543 by a Scottish hermit and obscure terminology used everyday by microbiologists is tedious. Goal is for `dictionary.txt` to be 1.4MB (~500kB gzipped), currently 2.8MB (~900kB gzipped).
+I am working on adding recent words like "looksmaxxing" and common proper nouns and proper adjectives like "Wednesday".
 
-`super25k.txt` is a semi-hand curated list of words that have a letter superset of popular words from https://www.wordfrequency.info and https://github.com/dolph/dictionary. These are words a native speaker can reasonably be expected to know and represent optimal plays (i.e, any other reasonable word is a letter subset of some word in this list).
+Also trying to reduce bad entries. It's ~60% garbage, but filtering out false positives is tedious. Goal is for `dictionary.txt` to be 1.4MB (~500kB gzipped), currently 2.8MB (~900kB gzipped).
 
-### Other word lists
-
-- https://github.com/dwyl/english-words
-  - missing all words starting with y
-- https://github.com/words/an-array-of-english-words
-  - letterpress word list + 4 words and 7 non-words
+`super25k.txt` is a semi-hand curated list of words that have a letter superset of popular words from https://www.wordfrequency.info and https://github.com/dolph/dictionary. These are words a native speaker can reasonably be expected to know and represent near-optimal plays (i.e, almost all top 25k popular words are a letter subset of some word in this list).
 
 ## Develop
 
