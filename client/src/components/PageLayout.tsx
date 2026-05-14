@@ -1,16 +1,24 @@
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
-import { Link } from "wouter-preact";
+import { Link, useRoute } from "wouter-preact";
 import { soundEnabled, toggleSound } from "../lib/sound";
 import { SettingsModal } from "./SettingsModal";
 
 export function PageLayout({ children }: { children: ComponentChildren }) {
   const [showSettings, setShowSettings] = useState(false);
   const [muted, setMuted] = useState(!soundEnabled);
+  const [isHome] = useRoute("/");
   return (
     <>
       <div class="flex justify-between gap-2 p-2 sticky top-0 z-10">
-        <Link class="font-bold bg-orange-100 p-2 rounded-xl" href="/">
+        <Link
+          class="text-xl font-bold bg-orange-100 p-1.5 rounded-xl"
+          href="/"
+          style={{
+            viewTransitionName: isHome ? undefined : "wordmongering-logo",
+            visibility: isHome ? "hidden" : "unset",
+          }}
+        >
           WORDMONGERING
         </Link>
         <div class="flex gap-2">
@@ -48,7 +56,7 @@ export function PageLayout({ children }: { children: ComponentChildren }) {
           </button>
         </div>
       </div>
-      <div class="max-w-screen-sm mx-auto px-4 flex-1 flex flex-col gap-8">{children}</div>
+      <div class="max-w-screen-sm w-full mx-auto px-4 flex-1 flex flex-col gap-8">{children}</div>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </>
   );
