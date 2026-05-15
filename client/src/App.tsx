@@ -1,6 +1,8 @@
 import { flushSync } from "preact/compat";
 import { Route, Router, type AroundNavHandler } from "wouter-preact";
+import { DictionaryProvider } from "./components/DictionaryContext";
 import { ArchivePage } from "./pages/ArchivePage";
+import { EndlessGamePage } from "./pages/EndlessGamePage";
 import { DailyGamePage } from "./pages/GamePage";
 import { HomePage } from "./pages/HomePage";
 
@@ -30,18 +32,19 @@ const aroundNav: AroundNavHandler = (navigate, to, options) => {
     return;
   }
   document.startViewTransition(() => {
-    flushSync(() => {
-      navigate(to, options);
-    });
+    flushSync(() => navigate(to, options));
   });
 };
 
 export function App() {
   return (
-    <Router aroundNav={aroundNav}>
-      <Route path="/" component={HomePage} />
-      <Route path="/archive" component={ArchivePage} />
-      <Route path="/daily/:day" component={DailyGamePage} />
-    </Router>
+    <DictionaryProvider>
+      <Router aroundNav={aroundNav}>
+        <Route path="/" component={HomePage} />
+        <Route path="/archive" component={ArchivePage} />
+        <Route path="/daily/:day" component={DailyGamePage} />
+        <Route path="/endless" component={EndlessGamePage} />
+      </Router>
+    </DictionaryProvider>
   );
 }

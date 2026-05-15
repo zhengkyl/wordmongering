@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { cl } from "../lib/cl";
 import type { PuzzleTile } from "../lib/computeGreenTiles";
 import { puzzleMatchedTiles } from "../lib/computeGreenTiles";
-import { LOCAL_WM_EPOCH, MS_PER_DAY } from "../lib/daily";
 import { serpentine, serpentineIndexForHeight } from "../lib/shapes";
 import { soundEnabled } from "../lib/sound";
 import { ReportModal } from "./ReportModal";
@@ -13,47 +12,70 @@ const POP_PEAK_MS = POP_DURATION * 0.25;
 const STEP_MS = 150;
 const TILE_PX = 48;
 
+const HELP_PAGES = [
+  { main: "Type a word containing this letter", sub: "Match more letters to clear faster" },
+  { main: "Match more letters to clear them faster", sub: "(longer chains = fewer words needed)" },
+  { main: "Words can't be repeated", sub: "(so mix it up as you go!)" },
+];
+
 let audioCtx: AudioContext | null = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new AudioContext();
+  audioCtx.resume().then(() => {
+    const buf = audioCtx!.createBuffer(1, 1, audioCtx!.sampleRate);
+    const src = audioCtx!.createBufferSource();
+    src.buffer = buf;
+    src.connect(audioCtx!.destination);
+    src.start(0);
+  });
+}
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 type GamePhase =
-  | { type: "intro"; offset: number }
+  | { type: "adding"; offset: number; initialOffset: number; addedAt: number }
   | { type: "idle" }
   | { type: "popping"; count: number }
   | { type: "sliding"; offset: number; initialOffset: number };
 
 export function Game({
-  day,
+  dictionary,
   puzzle,
   onComplete,
+  extraTilesOnTurn,
 }: {
-  day: number;
+  dictionary: Set<string>;
   puzzle: string;
-  onComplete: (words: string[]) => void;
+  onComplete?: (words: string[]) => void;
+  extraTilesOnTurn?: (turn: number) => string[];
 }) {
-  const dictionaryRef = useRef<Set<string> | null>(null);
-  const [dictLoaded, setDictLoaded] = useState(false);
-
   const inputRef = useRef<HTMLInputElement>(null);
 
   const usedWordsRef = useRef<string[]>([]);
   const prevMatchedCountRef = useRef(0);
+  const turnRef = useRef(0);
+  const nextIdRef = useRef(puzzle.length);
+  const maxTilesRef = useRef(puzzle.length);
+  const pendingAddRef = useRef<{ tiles: PuzzleTile[]; addedAt: number } | null>(null);
 
   const [tiles, setTiles] = useState<PuzzleTile[]>(
     puzzle.split("").map((letter, id) => ({ id, letter })),
   );
 
-  const [phase, setPhase] = useState<GamePhase>(() => ({
-    type: "intro",
-    offset: Math.ceil(serpentineIndexForHeight(window.innerHeight)) + 1,
-  }));
+  const [phase, setPhase] = useState<GamePhase>(() => {
+    const offset = Math.ceil(serpentineIndexForHeight(window.innerHeight)) + 1;
+    return { type: "adding", offset, initialOffset: offset, addedAt: 0 };
+  });
 
   const [input, setInput] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [reportWord, setReportWord] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(true);
+  const [helpPage, setHelpPage] = useState(0);
 
   useEffect(() => {
     function refocusOnType(e: KeyboardEvent) {
@@ -68,22 +90,12 @@ export function Game({
   useLayoutEffect(() => {
     window.scrollTo(0, document.body.scrollHeight);
     setPhase((prev) => {
-      if (prev.type !== "intro") return prev;
-      return { type: "intro", offset: prev.offset - 1 };
+      if (prev.type !== "adding" || prev.offset !== prev.initialOffset) return prev;
+      return { ...prev, offset: prev.offset - 1 };
     });
-  }, []);
+  }, [tiles.length]);
 
-  useEffect(() => {
-    fetch("/dictionary.txt")
-      .then((r) => r.text())
-      .then((text) => {
-        dictionaryRef.current = new Set(text.trim().split("\n"));
-        setDictLoaded(true);
-        console.log(`Dictionary loaded with ${dictionaryRef.current.size} words`);
-      });
-  }, []);
-
-  const slideOffset = phase.type === "intro" || phase.type === "sliding" ? phase.offset : null;
+  const slideOffset = phase.type === "adding" || phase.type === "sliding" ? phase.offset : null;
   const poppingCount = phase.type === "popping" ? phase.count : null;
   const isAnimating = phase.type !== "idle" || celebrating;
   const { matched, candidates } = puzzleMatchedTiles(tiles, input);
@@ -91,7 +103,9 @@ export function Game({
   let minX = 0,
     maxX = 0,
     minY = 0;
-  for (let i = 0; i < puzzle.length; i++) {
+  if (tiles.length > maxTilesRef.current) maxTilesRef.current = tiles.length;
+  const boundsCount = maxTilesRef.current;
+  for (let i = 0; i < boundsCount; i++) {
     const { x, y } = serpentine(i / 2);
     if (x < minX) minX = x;
     if (x > maxX) maxX = x;
@@ -121,7 +135,7 @@ export function Game({
   }
 
   async function handleSubmit() {
-    if (!dictLoaded || isAnimating) return;
+    if (dictionary === null || isAnimating) return;
 
     const greenCount = matched.length;
     if (greenCount === 0) {
@@ -134,12 +148,18 @@ export function Game({
       triggerError("Cannot repeat words");
       return;
     }
-    if (!dictionaryRef.current!.has(word)) {
+    if (!dictionary.has(word)) {
       triggerError("Not in dictionary");
       return;
     }
 
     const nextEnemy = tiles.slice(greenCount);
+    turnRef.current += 1;
+    const extraLetters = extraTilesOnTurn ? extraTilesOnTurn(turnRef.current) : [];
+    const extraTiles: PuzzleTile[] = extraLetters.map((letter) => ({
+      id: nextIdRef.current++,
+      letter,
+    }));
 
     usedWordsRef.current.push(word);
 
@@ -160,11 +180,27 @@ export function Game({
 
     setTimeout(
       () => {
-        setTiles(nextEnemy);
-        if (nextEnemy.length === 0) {
-          onComplete(usedWordsRef.current);
+        if (nextEnemy.length === 0 && extraTiles.length === 0) {
+          setTiles(nextEnemy);
+          if (onComplete) onComplete(usedWordsRef.current);
           return;
         }
+        if (nextEnemy.length === 0) {
+          // No slide needed; animate new tiles in directly.
+          // useLayoutEffect([tiles.length]) fires before paint and does the first decrement.
+          setTiles(extraTiles);
+          setPhase({
+            type: "adding",
+            offset: extraTiles.length + 1,
+            initialOffset: extraTiles.length + 1,
+            addedAt: 0,
+          });
+          return;
+        }
+        if (extraTiles.length > 0) {
+          pendingAddRef.current = { tiles: extraTiles, addedAt: nextEnemy.length };
+        }
+        setTiles(nextEnemy);
         setPhase({ type: "sliding", offset: greenCount, initialOffset: greenCount });
         setTimeout(() => {
           setPhase({ type: "sliding", offset: greenCount - 1, initialOffset: greenCount });
@@ -173,17 +209,9 @@ export function Game({
       POP_DURATION + (greenCount - 1) * POP_STAGGER_MS,
     );
   }
-
-  const dayDate = new Date(LOCAL_WM_EPOCH + (day - 1) * MS_PER_DAY);
-  const formattedDate = dayDate.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
   function getTileDuration() {
-    if (phase.type === "intro") {
-      const maxOffset = Math.ceil(serpentineIndexForHeight(window.innerHeight)) + 1;
-      const t = phase.offset / maxOffset;
+    if (phase.type === "adding") {
+      const t = phase.offset / phase.initialOffset;
       return Math.round(40 + 100 * (1 - t) ** 8);
     }
     if (phase.type === "sliding") {
@@ -199,44 +227,56 @@ export function Game({
   return (
     <>
       <div
-        class="absolute left-0 right-0 text-center bottom-60vh overflow-hidden"
-        style={{ animation: "fade-out 0.8s ease-out 1s forwards" }}
-      >
-        <div class="font-bold leading-none text-8xl whitespace-pre">Day {day}</div>
-        <div class="mt-1">{formattedDate}</div>
-      </div>
-      <div
         class="isolate relative mt-auto mx-auto"
         style={{ width: containerW, height: containerH }}
       >
         {tiles.map(({ id, letter }, index) => {
-          const { x, y } = positions[index + (slideOffset ?? 0)];
+          const tileOffset =
+            phase.type === "adding" && index < phase.addedAt ? 0 : (slideOffset ?? 0);
+          const { x, y } = positions[index + tileOffset];
           const isPopping = poppingCount !== null && index < poppingCount;
           const isMatched = matched.includes(id);
           const isNewlyMatched = isMatched && index >= prevMatchedCountRef.current;
+          const isFirstMoving =
+            (phase.type === "adding" && index === phase.addedAt) ||
+            (phase.type === "sliding" && index === 0);
           return (
             <div
               key={id}
               onTransitionEnd={
-                index === 0
+                isFirstMoving
                   ? (e) => {
                       if (e.propertyName !== "transform") return;
-                      setPhase((prev) => {
-                        if (prev.type !== "intro" && prev.type !== "sliding") return prev;
-                        if (prev.offset === 0) {
-                          return { type: "idle" };
+                      if (phase.type === "sliding" && phase.offset === 0) {
+                        const pending = pendingAddRef.current;
+                        if (pending !== null) {
+                          pendingAddRef.current = null;
+                          setTiles((prev) => [...prev, ...pending.tiles]);
+                          setPhase({
+                            type: "adding",
+                            offset: pending.tiles.length + 1,
+                            initialOffset: pending.tiles.length + 1,
+                            addedAt: pending.addedAt,
+                          });
+                        } else {
+                          setPhase({ type: "idle" });
                         }
-                        if (prev.type === "intro") {
-                          return { type: "intro", offset: prev.offset - 1 };
-                        }
-                        return { ...prev, offset: prev.offset - 1 };
-                      });
+                      } else {
+                        setPhase((prev) => {
+                          if (prev.type !== "adding" && prev.type !== "sliding") return prev;
+                          if (prev.offset === 0) return { type: "idle" };
+                          return { ...prev, offset: prev.offset - 1 };
+                        });
+                      }
                     }
                   : undefined
               }
               style={{
                 transform: `translate(${x}px, ${y}px)`,
-                transition: `transform ${tileDuration}ms linear`,
+                transition:
+                  phase.type === "adding" && index < phase.addedAt
+                    ? "none"
+                    : `transform ${tileDuration}ms linear`,
               }}
               class="absolute top-0 left-0 w-12 h-12 select-none"
             >
@@ -295,12 +335,13 @@ export function Game({
         )}
       </div>
       <div class="opacity-0" style={{ animation: "fade-in 0.8s ease-out 1.5s forwards" }}>
-        <div
-          class={cl(["text-center py-4 transition-opacity", phase.type === "intro" && "opacity-0"])}
-        >
-          <div>Type a word containing this letter</div>
-          <div>(and as many following letters as you can)</div>
+        <div class="text-sm text-center">
+          <div class="bg-background">
+            Type a word containing this letter.
+            <div class="text-stone-500 whitespace-pre">Match more letters to clear faster.</div>
+          </div>
         </div>
+
         <div class="py-2">
           <div class="relative">
             <input
@@ -308,6 +349,7 @@ export function Game({
               type="text"
               value={input}
               onInput={(e) => {
+                initAudio();
                 const newInput = (e.target as HTMLInputElement).value.trim();
                 prevMatchedCountRef.current = matched.length;
                 setInput(newInput);
@@ -362,10 +404,11 @@ export function Game({
   );
 }
 
-function playPop(delayMs: number, index: number) {
+async function playPop(delayMs: number, index: number) {
   if (!soundEnabled) return;
   if (!audioCtx) audioCtx = new AudioContext();
   const ctx = audioCtx;
+  await ctx.resume();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.connect(gain);
@@ -380,10 +423,11 @@ function playPop(delayMs: number, index: number) {
   osc.stop(t + 0.12);
 }
 
-function playHorn() {
+async function playHorn() {
   if (!soundEnabled) return;
   if (!audioCtx) audioCtx = new AudioContext();
   const ctx = audioCtx;
+  await ctx.resume();
   const t = ctx.currentTime;
 
   const filter = ctx.createBiquadFilter();
@@ -431,7 +475,7 @@ function WordmongeringCelebration() {
         <div class="text-stone-500 mt-1 sm:text-lg">/ˈwərd ˌməŋ·gər·iŋ/</div>
         <div class="mt-4 pt-4 border-t border-stone-800">
           <span class="italic text-stone-500">n.</span>
-          <span class="text-stone-300 ml-2 sm:text-lg">Use lot words no reason</span>
+          <span class="text-stone-300 ml-2 sm:text-lg">Using more words than necessary</span>
         </div>
       </div>
     </div>
