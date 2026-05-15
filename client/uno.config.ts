@@ -20,9 +20,9 @@ export default defineConfig({
     "btn-icon": "p-2 bg-orange-100 @hover:bg-orange-200/60 !active:bg-orange-200/80 rounded-xl",
     "btn-tab": "px-2 py-1 rounded-lg font-semibold",
     "btn-tab-active": "bg-orange-200 @hover:bg-orange-300 !active:bg-orange-400",
-    btn: "h-10 px-3 inline-flex justify-center items-center rounded-lg font-semibold text-center",
+    btn: "h-10 px-3 inline-flex sjustify-center items-center rounded-lg sfont-semibold text-center",
     "btn-lg":
-      "h-14 px-6 inline-flex justify-center items-center rounded-xl font-bold text-xl text-center",
+      "h-14 px-3 inline-flex sjustify-center items-center rounded-xl sfont-bold text-xl text-center",
   },
   variants: [],
 });

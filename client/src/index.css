@@ -2,13 +2,21 @@
   isolation: isolate;
 }
 
-dialog {
-  padding: 0;
-  max-width: min(24rem, calc(100% - 2rem));
+/* ::view-transition-group(*) {
+  animation-duration: 3s;
+} */
+
+html {
+  /* Necessary but unfixably breaks dialog backdrop */
+  scrollbar-gutter: stable;
+}
+dialog::backdrop {
+  background: none;
 }
 
-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.4);
+::view-transition-old(wordmongering-logo),
+::view-transition-new(wordmongering-logo) {
+  height: 100%;
 }
 
 html,
@@ -98,9 +106,9 @@ svg[data-lucide] {
   stroke-linejoin: round;
 }
 
-.short-stack-regular {
-  font-family: "Short Stack", cursive;
-  font-weight: 400;
+.winky-sans {
+  font-family: "Winky Sans", sans-serif;
+  font-optical-sizing: auto;
   font-style: normal;
 }
 

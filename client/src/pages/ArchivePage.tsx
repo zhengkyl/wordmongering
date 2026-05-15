@@ -69,8 +69,8 @@ export function ArchivePage() {
 
   return (
     <PageLayout>
-      <h1 class="mt-16 font-bold text-2xl text-center">Archive</h1>
-      <div class="p-4 flex flex-col gap-8 bg-orange-100 rounded-xl">
+      <h1 class="font-bold text-2xl text-center">Archive</h1>
+      <div class="flex flex-col gap-8">
         {months.map((mg) => (
           <MonthCalendar key={`${mg.year}-${mg.month}`} {...mg} />
         ))}
@@ -81,7 +81,7 @@ export function ArchivePage() {
 
 function MonthCalendar({ year, month, firstDayOfWeek, daysInMonth, puzzleDays }: MonthGroup) {
   return (
-    <div class="text-center">
+    <div class="p-2 bg-orange-100 rounded-xl text-center">
       <h2 class="font-semibold text-lg">
         {MONTH_NAMES[month]} {year}
       </h2>
@@ -99,7 +99,7 @@ function MonthCalendar({ year, month, firstDayOfWeek, daysInMonth, puzzleDays }:
             return (
               <div
                 key={dayOfMonth}
-                class="w-10 aspect-square flex items-center justify-center text-gray-200 select-none"
+                class="h-12 flex items-center justify-center text-gray-200 select-none"
                 aria-hidden
               >
                 {dayOfMonth}
@@ -112,7 +112,7 @@ function MonthCalendar({ year, month, firstDayOfWeek, daysInMonth, puzzleDays }:
               key={dayOfMonth}
               href={`/daily/${info.puzzleDay}`}
               class={cl([
-                "w-10 aspect-square flex items-center justify-center @hover:bg-stone-200",
+                "h-12 flex items-center justify-center @hover:bg-stone-200",
                 info.completed && " bg-green-100 text-green-700",
               ])}
             >

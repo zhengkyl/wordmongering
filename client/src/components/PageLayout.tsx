@@ -1,10 +1,19 @@
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { Link, useRoute } from "wouter-preact";
+import { cl } from "../lib/cl";
 import { soundEnabled, toggleSound } from "../lib/sound";
 import { SettingsModal } from "./SettingsModal";
 
-export function PageLayout({ children }: { children: ComponentChildren }) {
+export function PageLayout({
+  children,
+  noHeaderLogo,
+  noVerticalPadding,
+}: {
+  children: ComponentChildren;
+  noHeaderLogo?: true;
+  noVerticalPadding?: true;
+}) {
   const [showSettings, setShowSettings] = useState(false);
   const [muted, setMuted] = useState(!soundEnabled);
   const [isHome] = useRoute("/");
@@ -14,10 +23,15 @@ export function PageLayout({ children }: { children: ComponentChildren }) {
         <Link
           class="text-xl font-bold bg-orange-100 p-1.5 rounded-xl"
           href="/"
-          style={{
-            viewTransitionName: isHome ? undefined : "wordmongering-logo",
-            visibility: isHome ? "hidden" : "unset",
-          }}
+          style={
+            noHeaderLogo
+              ? {
+                  visibility: "hidden",
+                }
+              : {
+                  viewTransitionName: "wordmongering-logo",
+                }
+          }
         >
           WORDMONGERING
         </Link>
@@ -56,7 +70,14 @@ export function PageLayout({ children }: { children: ComponentChildren }) {
           </button>
         </div>
       </div>
-      <div class="max-w-screen-sm w-full mx-auto px-4 flex-1 flex flex-col gap-8">{children}</div>
+      <div
+        class={cl([
+          "max-w-screen-sm w-full mx-auto px-4 flex-1 flex flex-col gap-8",
+          noVerticalPadding ? "" : "py-16",
+        ])}
+      >
+        {children}
+      </div>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </>
   );
