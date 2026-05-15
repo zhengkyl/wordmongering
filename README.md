@@ -6,6 +6,8 @@ Try it out at [wordmongering.com](https://wordmongering.com)
 
 ## TODO
 
+- show score and alternate play button if played already
+
 - improve tui
 - improve everything else
 

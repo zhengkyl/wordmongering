@@ -8,7 +8,7 @@ install:
 	cd backend && go mod download
 
 dev:
-	trap 'kill %1' EXIT; cd client && PORT=$(PORT) pnpm dev --port $(DEV_PORT) --host & cd backend && PORT=$(PORT) go run .
+	trap 'kill 0' EXIT; cd client && PORT=$(PORT) pnpm dev --port $(DEV_PORT) --host & cd backend && PORT=$(PORT) go run .
 
 dev-dash:
 	ROOT=$(CURDIR) DEBUG=1 cd backend && go run ./cmd/dash

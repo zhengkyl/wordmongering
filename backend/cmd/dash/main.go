@@ -367,20 +367,57 @@ func (d puzzleDelegate) Spacing() int                             { return 1 }
 func (d puzzleDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd { return nil }
 
 var (
-	titleStyle    = lipgloss.NewStyle().Bold(true)
-	selectedStyle = lipgloss.NewStyle().Bold(true)
-	dimStyle      = lipgloss.NewStyle().Faint(true)
-	errStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	warnStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	accent    = lipgloss.Color("#7C3AED")
+	muted     = lipgloss.Color("241")
+	errColor  = lipgloss.Color("9")
+	warnColor = lipgloss.Color("11")
+
+	titleStyle       = lipgloss.NewStyle().Bold(true)
+	selectedStyle    = lipgloss.NewStyle().Bold(true).Foreground(accent)
+	dimStyle         = lipgloss.NewStyle().Foreground(muted)
+	errStyle         = lipgloss.NewStyle().Foreground(errColor)
+	warnStyle        = lipgloss.NewStyle().Foreground(warnColor)
+	inputBorderStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(accent).
+				Padding(0, 1)
 )
+
+func renderHeader(width int, left, right string) string {
+	if width <= 0 {
+		width = 80
+	}
+	pad := width - lipgloss.Width(left) - lipgloss.Width(right) - 2
+	if pad < 0 {
+		pad = 0
+	}
+	content := " " + left + strings.Repeat(" ", pad) + right + " "
+	return lipgloss.NewStyle().
+		Background(accent).
+		Foreground(lipgloss.Color("15")).
+		Bold(true).
+		Render(content)
+}
+
+func renderFooter(width int, hints string) string {
+	if width <= 0 {
+		width = 80
+	}
+	sep := lipgloss.NewStyle().Foreground(muted).Render(strings.Repeat("─", width))
+	return sep + "\n" + lipgloss.NewStyle().Foreground(muted).Render(" "+hints)
+}
+
+func renderKey(k, desc string) string {
+	return lipgloss.NewStyle().Bold(true).Foreground(accent).Render(k) +
+		lipgloss.NewStyle().Foreground(muted).Render(" "+desc)
+}
 
 func (d puzzleDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	p := item.(puzzleItem)
 	date := dayToDate(p.day)
+	selected := index == m.Index()
 
-	const leftWidth = 10
 	blocks := []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
-
 	maxVal, lastNonZero, total := 0, 0, 0
 	for j := 1; j <= maxWords; j++ {
 		if p.hist[j] > maxVal {
@@ -392,29 +429,31 @@ func (d puzzleDelegate) Render(w io.Writer, m list.Model, index int, item list.I
 		total += p.hist[j]
 	}
 
-	barPart, labelPart := "", ""
+	var barPart, labelPart string
 	if total > 0 {
 		for j := 1; j <= lastNonZero; j++ {
 			if p.hist[j] == 0 {
 				barPart += "   "
+				labelPart += "   "
 			} else {
 				barPart += string(blocks[min(len(blocks)-1, p.hist[j]*len(blocks)/maxVal)]) + "  "
+				labelPart += fmt.Sprintf("%2d ", j)
 			}
-			labelPart += fmt.Sprintf("%2d ", j)
 		}
-		barPart += fmt.Sprintf("  (%d)", total)
+		barPart += dimStyle.Render(fmt.Sprintf("(%d)", total))
 	}
 
-	line1 := fmt.Sprintf("%-*s", leftWidth, fmt.Sprintf("Day %d", p.day)) + barPart
-	line2 := fmt.Sprintf("%-*s", leftWidth, date.Format("Jan 02")) + dimStyle.Render(labelPart)
+	const colW = 8
+	dayStr := fmt.Sprintf("Day %d", p.day)
+	dateStr := date.Format("Jan 02")
 
-	if index == m.Index() {
-		fmt.Fprintln(w, selectedStyle.Render("> "+line1))
+	if selected {
+		fmt.Fprintln(w, selectedStyle.Render("▌")+" "+selectedStyle.Render(fmt.Sprintf("%-*s", colW, dayStr))+"  "+barPart)
 	} else {
-		fmt.Fprintln(w, "  "+line1)
+		fmt.Fprintln(w, "  "+titleStyle.Render(fmt.Sprintf("%-*s", colW, dayStr))+"  "+barPart)
 	}
-	fmt.Fprintln(w, "  "+line2)
-	fmt.Fprint(w, "  "+p.puzzle)
+	fmt.Fprintln(w, "  "+dimStyle.Render(fmt.Sprintf("%-*s", colW, dateStr))+"  "+dimStyle.Render(labelPart))
+	fmt.Fprint(w, "  "+dimStyle.Render(p.puzzle))
 }
 
 type keyMap struct {
@@ -521,10 +560,12 @@ func savePuzzle(db *sql.DB, day int, pz string) tea.Cmd {
 }
 
 type model struct {
-	db              *sql.DB
-	list            list.Model
-	view            viewState
-	input           textinput.Model
+	db           *sql.DB
+	width        int
+	height       int
+	list         list.Model
+	view         viewState
+	input        textinput.Model
 	editDay      int
 	genLen       int
 	freqIdx      int
@@ -532,14 +573,14 @@ type model struct {
 	editHasSolve bool
 	resultPuzzle string
 	resultSolve  minSolveResult
-	allLoaded       bool
-	loading         bool
-	err             error
+	allLoaded    bool
+	loading      bool
+	err          error
 }
 
 func newModel(db *sql.DB) model {
 	l := list.New(nil, puzzleDelegate{}, 80, 20)
-	l.Title = "Puzzles"
+	l.Title = ""
 	l.SetFilteringEnabled(false)
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{keys.Add, keys.Edit}
@@ -549,7 +590,7 @@ func newModel(db *sql.DB) model {
 	}
 
 	ti := textinput.New()
-	ti.Placeholder = "puzzle string"
+	ti.Placeholder = "puzzle letters..."
 	ti.CharLimit = 256
 
 	return model{
@@ -569,8 +610,10 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.list.SetWidth(msg.Width)
-		m.list.SetHeight(msg.Height)
+		m.list.SetHeight(msg.Height - 1)
 		return m, nil
 	case tea.KeyPressMsg:
 		switch m.view {
@@ -706,77 +749,105 @@ func (m model) View() tea.View {
 	case viewResult:
 		s = m.viewResult()
 	default:
-		s = m.list.View()
-	}
-	if m.err != nil {
-		s += "\n" + errStyle.Render("error: "+m.err.Error())
+		s = renderHeader(m.width, "DASH", "puzzles") + "\n" + m.list.View()
+		if m.err != nil {
+			s += "\n" + errStyle.Render("error: "+m.err.Error())
+		}
 	}
 	return tea.NewView(s)
 }
 
 func (m model) viewEdit() string {
-	var title string
+	var headerRight string
 	if m.editDay == -1 {
-		title = "Add Puzzle"
+		headerRight = "new"
 	} else {
-		title = "Edit Day " + strconv.Itoa(m.editDay)
+		headerRight = fmt.Sprintf("day %d", m.editDay)
 	}
-	s := titleStyle.Render(title) + "\n\n"
-	s += "Puzzle: " + m.input.View() + "\n"
-	s += dimStyle.Render(fmt.Sprintf("%d chars", len([]rune(m.input.Value())))) + "\n\n"
-	s += dimStyle.Render(fmt.Sprintf("gen length: %d  [+/-]  freq: %s  [[/]]  [g] generate", m.genLen, freqDists[m.freqIdx].name)) + "\n"
+
+	charCount := len([]rune(m.input.Value()))
+	genControls := renderKey("[/]", freqDists[m.freqIdx].name) + "  " +
+		renderKey("+/-", fmt.Sprintf("len %d", m.genLen)) + "  " +
+		renderKey("g", "generate")
+	footer := renderKey("↵", "save") + "  " + renderKey("esc", "cancel")
+
+	var b strings.Builder
+	b.WriteString(renderHeader(m.width, "DASH", headerRight))
+	b.WriteString("\n\n")
+	for _, line := range strings.Split(inputBorderStyle.Render(m.input.View()), "\n") {
+		b.WriteString("  " + line + "\n")
+	}
+	b.WriteString("  " + dimStyle.Render(strconv.Itoa(charCount)+" chars") + "\n\n")
+	b.WriteString("  " + genControls + "\n")
 	if m.editHasSolve {
-		s += renderSolve(m.editSolve, 1) + "\n"
+		b.WriteString("\n")
+		for _, line := range strings.Split(renderSolve(m.editSolve, 1), "\n") {
+			b.WriteString("  " + line + "\n")
+		}
 	}
-	s += dimStyle.Render("[enter] save  [esc] cancel")
-	return s
+	if m.err != nil {
+		b.WriteString("\n  " + errStyle.Render(m.err.Error()) + "\n")
+	}
+	b.WriteString(renderFooter(m.width, footer))
+	return b.String()
 }
 
 func (m model) viewResult() string {
-	var dayStr string
+	var headerRight string
 	if m.editDay == -1 {
-		dayStr = "new"
+		headerRight = "new · saved"
 	} else {
 		date := dayToDate(m.editDay)
-		dayStr = fmt.Sprintf("Day %d, %s", m.editDay, date.Format("Jan 02"))
+		headerRight = fmt.Sprintf("day %d · %s · saved", m.editDay, date.Format("Jan 02"))
 	}
-	s := titleStyle.Render(fmt.Sprintf("%q (%s)", m.resultPuzzle, dayStr)) + "\n\n"
 
 	marks := annotate(m.resultPuzzle)
-	s += m.resultPuzzle + "\n"
-
-	var annotLine strings.Builder
-	for _, ch := range marks {
-		switch ch {
+	var coloredPuzzle strings.Builder
+	for i, ch := range m.resultPuzzle {
+		switch marks[i] {
 		case 'D':
-			annotLine.WriteString(errStyle.Render("D"))
+			coloredPuzzle.WriteString(errStyle.Render(string(ch)))
 		case '1':
-			annotLine.WriteString(warnStyle.Render("1"))
+			coloredPuzzle.WriteString(warnStyle.Render(string(ch)))
 		default:
-			annotLine.WriteString(dimStyle.Render("."))
+			coloredPuzzle.WriteString(string(ch))
 		}
 	}
-	s += annotLine.String() + "\n"
-	s += dimStyle.Render("D=dead  1=one word  .=fine") + "\n"
-	s += renderSolve(m.resultSolve, 5) + "\n"
-	s += "\n" + dimStyle.Render("[any key] back")
-	return s
+	legend := errStyle.Render("D") + dimStyle.Render("=dead  ") +
+		warnStyle.Render("1") + dimStyle.Render("=one word  ") +
+		dimStyle.Render(".=fine")
+
+	var b strings.Builder
+	b.WriteString(renderHeader(m.width, "DASH", headerRight))
+	b.WriteString("\n\n")
+	b.WriteString("  " + coloredPuzzle.String() + "\n")
+	b.WriteString("  " + legend + "\n\n")
+	for _, line := range strings.Split(renderSolve(m.resultSolve, 5), "\n") {
+		b.WriteString("  " + line + "\n")
+	}
+	if m.err != nil {
+		b.WriteString("\n  " + errStyle.Render(m.err.Error()) + "\n")
+	}
+	b.WriteString(renderFooter(m.width, renderKey("any key", "back")))
+	return b.String()
 }
 
 func renderSolve(r minSolveResult, maxExamples int) string {
 	if r.count < 0 {
-		return warnStyle.Render("min solve: unsolvable")
+		return warnStyle.Render("unsolvable")
 	}
+	label := dimStyle.Render("min solve  ") + titleStyle.Render(strconv.Itoa(r.count))
 	if len(r.examples) == 0 {
-		return fmt.Sprintf("min solve: %d", r.count)
+		return label
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "min solve: %d\n", r.count)
+	b.WriteString(label + "\n")
 	for i, ex := range r.examples {
 		if i >= maxExamples {
 			break
 		}
-		fmt.Fprintf(&b, "  %d: %s", i+1, strings.Join(ex, " · "))
+		b.WriteString(dimStyle.Render(fmt.Sprintf("  %d", i+1)) + "  " +
+			strings.Join(ex, dimStyle.Render(" · ")))
 		if i < len(r.examples)-1 && i < maxExamples-1 {
 			b.WriteByte('\n')
 		}
