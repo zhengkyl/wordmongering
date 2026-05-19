@@ -7,7 +7,7 @@ sudo apt install rclone
 rclone config
 ```
 
-Make `backup.sh`
+Create `backup.sh`
 
 ```sh
 #!/bin/bash
@@ -18,7 +18,7 @@ BACKUP_FILE="/tmp/wm-backup-$(date +%Y-%m-%dT%H:%M:%S).db"
 BACKUP_DEST="<remote>:<bucket>"
 
 CONTAINER=$(docker compose -f "$APP_DIR/compose.yaml" ps -q app)
-docker exec "$CONTAINER" sqlite3 data/data.db ".backup /tmp/backup.db"
+docker exec "$CONTAINER" sqlite3 data/app.db ".backup /tmp/backup.db"
 docker cp "$CONTAINER:/tmp/backup.db" "$BACKUP_FILE"
 docker exec "$CONTAINER" rm /tmp/backup.db
 

@@ -368,21 +368,28 @@ type savedMsg struct{ puzzle string }
 type scoreHistsMsg map[int][common.MaxWords + 1]int
 type puzzleErrMsg struct{ error }
 
-func loadMorePuzzles(db *sql.DB, offset int) tea.Cmd {
+func loadAllPuzzles(path string) tea.Cmd {
 	return func() tea.Msg {
-		rows, err := db.Query(
-			"SELECT day, puzzle FROM puzzles ORDER BY day DESC LIMIT ? OFFSET ?",
-			common.PageSize, offset,
-		)
+		data, err := os.ReadFile(path)
 		if err != nil {
+			if os.IsNotExist(err) {
+				return morePuzzlesMsg(nil)
+			}
 			return puzzleErrMsg{err}
 		}
-		defer rows.Close()
-		var puzzles []puzzleRow
-		for rows.Next() {
-			var p puzzleRow
-			rows.Scan(&p.day, &p.puzzle)
-			puzzles = append(puzzles, p)
+		content := strings.TrimRight(string(data), "\n")
+		if content == "" {
+			return morePuzzlesMsg(nil)
+		}
+		lines := strings.Split(content, "\n")
+		puzzles := make([]puzzleRow, 0, len(lines))
+		for i, line := range lines {
+			if line != "" {
+				puzzles = append(puzzles, puzzleRow{day: i + 1, puzzle: line})
+			}
+		}
+		for i, j := 0, len(puzzles)-1; i < j; i, j = i+1, j-1 {
+			puzzles[i], puzzles[j] = puzzles[j], puzzles[i]
 		}
 		return morePuzzlesMsg(puzzles)
 	}
@@ -391,7 +398,7 @@ func loadMorePuzzles(db *sql.DB, offset int) tea.Cmd {
 func loadScoreHists(db *sql.DB) tea.Cmd {
 	return func() tea.Msg {
 		rows, err := db.Query(
-			"SELECT day, json_array_length(words) AS score, COUNT(*) FROM results GROUP BY day, score",
+			"SELECT puzzle_id, json_array_length(words) AS score, COUNT(*) FROM solves GROUP BY puzzle_id, score",
 		)
 		if err != nil {
 			return puzzleErrMsg{err}
@@ -399,28 +406,39 @@ func loadScoreHists(db *sql.DB) tea.Cmd {
 		defer rows.Close()
 		hists := make(map[int][common.MaxWords + 1]int)
 		for rows.Next() {
-			var day, score, count int
-			rows.Scan(&day, &score, &count)
+			var puzzleId, score, count int
+			rows.Scan(&puzzleId, &score, &count)
 			if score < 1 || score > common.MaxWords {
 				continue
 			}
-			h := hists[day]
+			h := hists[puzzleId]
 			h[score] = count
-			hists[day] = h
+			hists[puzzleId] = h
 		}
 		return scoreHistsMsg(hists)
 	}
 }
 
-func savePuzzle(db *sql.DB, day int, pz string) tea.Cmd {
+func savePuzzle(path string, day int, pz string) tea.Cmd {
 	return func() tea.Msg {
-		var err error
-		if day == -1 {
-			_, err = db.Exec("INSERT INTO puzzles (puzzle) VALUES (?)", pz)
-		} else {
-			_, err = db.Exec("UPDATE puzzles SET puzzle = ? WHERE day = ?", pz, day)
+		data, err := os.ReadFile(path)
+		if err != nil && !os.IsNotExist(err) {
+			return puzzleErrMsg{err}
 		}
-		if err != nil {
+		var lines []string
+		if content := strings.TrimRight(string(data), "\n"); content != "" {
+			lines = strings.Split(content, "\n")
+		}
+		if day == -1 {
+			lines = append(lines, pz)
+		} else {
+			idx := day - 1
+			if idx >= len(lines) {
+				return puzzleErrMsg{fmt.Errorf("day %d out of range", day)}
+			}
+			lines[idx] = pz
+		}
+		if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0644); err != nil {
 			return puzzleErrMsg{err}
 		}
 		return savedMsg{puzzle: pz}
@@ -529,7 +547,7 @@ func (m *Model) SetProps(props common.Props) {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(loadMorePuzzles(m.props.Global.DB, 0), loadScoreHists(m.props.Global.DB))
+	return tea.Batch(loadAllPuzzles(m.props.Global.PuzzlePath), loadScoreHists(m.props.Global.DB))
 }
 
 func (m *Model) IsEditing() bool {
@@ -569,9 +587,7 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 		}
 	case morePuzzlesMsg:
 		m.loading = false
-		if len(msg) < common.PageSize {
-			m.allLoaded = true
-		}
+		m.allLoaded = true
 		for _, p := range msg {
 			m.items = append(m.items, puzzleItem{day: p.day, puzzle: p.puzzle})
 		}
@@ -588,7 +604,7 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 		m.pager.Reset()
 		m.allLoaded = false
 		m.loading = true
-		return tea.Batch(loadMorePuzzles(m.props.Global.DB, 0), loadScoreHists(m.props.Global.DB))
+		return tea.Batch(loadAllPuzzles(m.props.Global.PuzzlePath), loadScoreHists(m.props.Global.DB))
 	case puzzleErrMsg:
 		m.err = msg.error
 	}
@@ -619,10 +635,6 @@ func (m *Model) updateList(msg tea.KeyPressMsg) tea.Cmd {
 		m.pager.MoveUp()
 	case key.Matches(msg, km.Down):
 		m.pager.MoveDown(len(m.items))
-		if !m.allLoaded && !m.loading && m.pager.Cursor >= len(m.items)-3 {
-			m.loading = true
-			return loadMorePuzzles(m.props.Global.DB, len(m.items))
-		}
 	}
 	return nil
 }
@@ -643,7 +655,7 @@ func (m *Model) updateEdit(msg tea.KeyPressMsg) tea.Cmd {
 		m.savedPuzzle = val
 		m.savedSolve = computeMinSolve(val)
 		m.input.Blur()
-		return savePuzzle(m.props.Global.DB, m.editDay, val)
+		return savePuzzle(m.props.Global.PuzzlePath, m.editDay, val)
 	case key.Matches(msg, km.Gen):
 		generated := generatePuzzle(m.genLen, freqDists[m.freqIdx].freqs)
 		m.input.SetValue(generated)

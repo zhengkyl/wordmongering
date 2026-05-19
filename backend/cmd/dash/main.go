@@ -14,17 +14,23 @@ import (
 )
 
 func main() {
-	root, ok := os.LookupEnv("ROOT")
-	if !ok {
-		root = ".."
+	staticDir := os.Getenv("STATIC_DIR")
+	if staticDir == "" {
+		fmt.Fprint(os.Stderr, "STATIC_DIR not set")
+		os.Exit(1)
+	}
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		fmt.Fprint(os.Stderr, "DB_PATH not set")
+		os.Exit(1)
 	}
 
-	if err := puzzles.InitWords(filepath.Join(root, "client/dist/super25k.txt")); err != nil {
+	if err := puzzles.InitWords(filepath.Join(staticDir, "super25k.txt")); err != nil {
 		fmt.Fprintf(os.Stderr, "load words: %v\n", err)
 		os.Exit(1)
 	}
 
-	db, err := sql.Open("sqlite3", filepath.Join(root, "data/app.db"))
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "open db: %v\n", err)
 		os.Exit(1)
@@ -33,8 +39,9 @@ func main() {
 
 	props := common.Props{
 		Global: common.Global{
-			DB:     db,
-			KeyMap: keymap.Default(),
+			DB:         db,
+			KeyMap:     keymap.Default(),
+			PuzzlePath: filepath.Join(staticDir, "puzzles.txt"),
 		},
 	}
 

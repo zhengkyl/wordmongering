@@ -12,12 +12,6 @@ const POP_PEAK_MS = POP_DURATION * 0.25;
 const STEP_MS = 150;
 const TILE_PX = 48;
 
-const HELP_PAGES = [
-  { main: "Type a word containing this letter", sub: "Match more letters to clear faster" },
-  { main: "Match more letters to clear them faster", sub: "(longer chains = fewer words needed)" },
-  { main: "Words can't be repeated", sub: "(so mix it up as you go!)" },
-];
-
 let audioCtx: AudioContext | null = null;
 
 function initAudio() {
@@ -41,12 +35,12 @@ type GamePhase =
   | { type: "sliding"; offset: number; initialOffset: number };
 
 export function Game({
-  dictionary,
+  words,
   puzzle,
   onComplete,
   extraTilesOnTurn,
 }: {
-  dictionary: Set<string>;
+  words: Set<string>;
   puzzle: string;
   onComplete?: (words: string[]) => void;
   extraTilesOnTurn?: (turn: number) => string[];
@@ -135,7 +129,7 @@ export function Game({
   }
 
   async function handleSubmit() {
-    if (dictionary === null || isAnimating) return;
+    if (words === null || isAnimating) return;
 
     const greenCount = matched.length;
     if (greenCount === 0) {
@@ -148,8 +142,8 @@ export function Game({
       triggerError("Cannot repeat words");
       return;
     }
-    if (!dictionary.has(word)) {
-      triggerError("Not in dictionary");
+    if (!words.has(word)) {
+      triggerError("Not in word list");
       return;
     }
 
@@ -387,7 +381,7 @@ export function Game({
           </div>
           <div class="flex h-9 px-3 sm:px-4 py-2 gap-2 text-sm text-red-600" role="alert">
             <span>{errorMsg}</span>
-            {errorMsg === "Not in dictionary" && (
+            {errorMsg === "Not in word list" && (
               <button
                 class="underline text-red-400 hover:text-red-600"
                 onClick={() => setReportWord(input)}

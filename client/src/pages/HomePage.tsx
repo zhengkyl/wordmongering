@@ -2,6 +2,7 @@ import { Link } from "wouter-preact";
 import { DayDisplay } from "../components/DayDisplay";
 import { PageLayout } from "../components/PageLayout";
 import { getDayNumber } from "../lib/daily";
+import { getDayResults } from "../lib/storage";
 
 function WordTiles() {
   return (
@@ -47,14 +48,24 @@ function WordTiles() {
 
 export function HomePage() {
   const dayNumber = getDayNumber();
+  const todayResult = getDayResults(dayNumber);
 
   return (
     <PageLayout noHeaderLogo>
       <WordTiles />
       <DayDisplay day={dayNumber} class="mx-auto w-fit text-center" />
+      {todayResult && (
+        <div class="text-center text-stone-500 text-sm">
+          Your score:{" "}
+          <span class="font-semibold text-stone-700">{todayResult.bestScore} words</span>
+        </div>
+      )}
       <div class="grid grid-cols-2 gap-2">
-        <Link href="/daily/today" class="btn-lg btn-orange spx-12 col-span-2">
-          Play daily puzzle
+        <Link
+          href="/puzzles/today"
+          class={`btn-lg col-span-2 ${todayResult ? "btn-sec" : "btn-orange spx-12"}`}
+        >
+          {todayResult ? "Replay daily puzzle" : "Play daily puzzle"}
         </Link>
         <Link href="/archive" class="btn btn-sec">
           Past puzzles

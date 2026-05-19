@@ -1,6 +1,8 @@
 ## Code style
 
 - Remember! Do not run build or type checking commands.
+- Do not pick the easy way out and settle.
+- Either do what the user asks for or clarify.
 
 - Do not run build or type checking commands.
 - Preact: use `class` not `className`; `onInput` not `onChange`

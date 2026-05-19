@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/bits-and-blooms/bloom/v3"
@@ -17,41 +18,43 @@ import (
 )
 
 type spaHandler struct {
-	root string
-	fs   http.Handler
+	staticDir string
+	fs        http.Handler
 }
 
 func newSpaHandler(staticDir string) *spaHandler {
 	return &spaHandler{
-		root: staticDir,
-		fs:   http.FileServer(http.Dir(staticDir)),
+		staticDir: staticDir,
+		fs:        http.FileServer(http.Dir(staticDir)),
 	}
 }
 
 func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	path := filepath.Join(h.root, filepath.Clean("/"+r.URL.Path))
+	path := filepath.Join(h.staticDir, filepath.Clean("/"+r.URL.Path))
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		http.ServeFile(w, r, filepath.Join(h.root, "index.html"))
+		http.ServeFile(w, r, filepath.Join(h.staticDir, "index.html"))
 		return
 	}
 	h.fs.ServeHTTP(w, r)
 }
 
 type api struct {
-	db     *sql.DB
-	pepper string
-	dict   *bloom.BloomFilter
+	db          *sql.DB
+	pepper      string
+	dict        *bloom.BloomFilter
+	puzzlesPath string
+	puzzlesMu   sync.RWMutex
+	puzzles     []string
 }
 
-func newApiHandler(db *sql.DB, root string, pepper string) (*api, error) {
-	f, err := os.Open(filepath.Join(root, "client/dist/dictionary.txt"))
+func newApiHandler(db *sql.DB, staticDir string, pepper string) (*api, error) {
+	f, err := os.Open(filepath.Join(staticDir, "words.txt"))
 	if err != nil {
-		return nil, fmt.Errorf("open dictionary: %w", err)
+		return nil, fmt.Errorf("open words: %w", err)
 	}
 	defer f.Close()
 
 	filter := bloom.NewWithEstimates(300000, 0.01)
-
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		if word := scanner.Text(); word != "" {
@@ -60,10 +63,44 @@ func newApiHandler(db *sql.DB, root string, pepper string) (*api, error) {
 	}
 
 	return &api{
-		db:     db,
-		pepper: pepper,
-		dict:   filter,
+		db:          db,
+		pepper:      pepper,
+		dict:        filter,
+		puzzlesPath: filepath.Join(staticDir, "puzzles.txt"),
 	}, nil
+}
+
+func (a *api) getPuzzle(day int) (string, bool) {
+	a.puzzlesMu.RLock()
+	if day <= len(a.puzzles) {
+		p := a.puzzles[day-1]
+		a.puzzlesMu.RUnlock()
+		return p, true
+	}
+	a.puzzlesMu.RUnlock()
+
+	a.puzzlesMu.Lock()
+	defer a.puzzlesMu.Unlock()
+	if day <= len(a.puzzles) {
+		return a.puzzles[day-1], true
+	}
+	f, err := os.Open(a.puzzlesPath)
+	if err != nil {
+		return "", false
+	}
+	defer f.Close()
+	var puzzles []string
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		if line := s.Text(); line != "" {
+			puzzles = append(puzzles, line)
+		}
+	}
+	a.puzzles = puzzles
+	if day > len(a.puzzles) {
+		return "", false
+	}
+	return a.puzzles[day-1], true
 }
 
 // Earliest Midnight April 27, 2026 UTC+14
@@ -86,23 +123,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
-func (a *api) handleGetPuzzle(w http.ResponseWriter, r *http.Request) {
-	day, ok := parseDay(r)
-	if !ok {
-		http.Error(w, "Invalid day", http.StatusBadRequest)
-		return
-	}
-
-	var puzzle string
-	if err := a.db.QueryRow("SELECT puzzle FROM puzzles WHERE day = ?", day).Scan(&puzzle); err != nil {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
-	writeJSON(w, map[string]string{"puzzle": puzzle})
-}
-
-func (a *api) handleGetResults(w http.ResponseWriter, r *http.Request) {
+func (a *api) handleGetSolves(w http.ResponseWriter, r *http.Request) {
 	day, ok := parseDay(r)
 	if !ok {
 		http.Error(w, "Invalid day", http.StatusBadRequest)
@@ -110,7 +131,7 @@ func (a *api) handleGetResults(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := a.db.Query(
-		"SELECT json_array_length(words) AS score, COUNT(*) FROM results WHERE day = ? GROUP BY score", day,
+		"SELECT json_array_length(words) AS score, COUNT(*) FROM solves WHERE puzzle_id = ? GROUP BY score", day,
 	)
 	if err != nil {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
@@ -118,54 +139,36 @@ func (a *api) handleGetResults(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	allPlays := make(map[int]int)
+	rawCounts := make(map[int]int)
+	total := 0
 	for rows.Next() {
 		var score, count int
 		rows.Scan(&score, &count)
-		allPlays[score] = count
+		rawCounts[score] = count
+		total += count
 	}
 
-	firstRows, err := a.db.Query(`
-		SELECT json_array_length(r.words) AS score, COUNT(*)
-		FROM results r
-		INNER JOIN (
-			SELECT MIN(id) as id FROM results WHERE day = ? GROUP BY player_hint
-		) fp ON r.id = fp.id
-		GROUP BY score
-	`, day)
-
-	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
-	}
-	defer firstRows.Close()
-
-	firstPlays := make(map[int]int)
-	for firstRows.Next() {
-		var score, count int
-		firstRows.Scan(&score, &count)
-		firstPlays[score] = count
+	scoreDistribution := make(map[int]int, len(rawCounts))
+	for score, count := range rawCounts {
+		scoreDistribution[score] = int(math.Round(float64(count) / float64(total) * 100))
 	}
 
-	writeJSON(w, map[string]any{
-		"allPlays":   allPlays,
-		"firstPlays": firstPlays,
-	})
+	writeJSON(w, scoreDistribution)
 }
 
-type resultBody struct {
+type solveBody struct {
 	PlayerHint string   `json:"playerHint"`
 	Words      []string `json:"words"`
 }
 
-func (a *api) handlePostResults(w http.ResponseWriter, r *http.Request) {
+func (a *api) handlePostSolves(w http.ResponseWriter, r *http.Request) {
 	day, ok := parseDay(r)
 	if !ok {
 		http.Error(w, "Invalid day", http.StatusBadRequest)
 		return
 	}
 
-	var body resultBody
+	var body solveBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
@@ -180,8 +183,8 @@ func (a *api) handlePostResults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var puzzle string
-	if err := a.db.QueryRow("SELECT puzzle FROM puzzles WHERE day = ?", day).Scan(&puzzle); err != nil {
+	puzzle, ok := a.getPuzzle(day)
+	if !ok {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
@@ -210,7 +213,7 @@ func (a *api) handlePostResults(w http.ResponseWriter, r *http.Request) {
 
 	wordsJSON, _ := json.Marshal(body.Words)
 
-	if _, err := a.db.Exec("INSERT INTO results (player_hint, day, words) VALUES (?, ?, ?)", body.PlayerHint, day, string(wordsJSON)); err != nil {
+	if _, err := a.db.Exec("INSERT INTO solves (player_hint, puzzle_id, words) VALUES (?, ?, ?)", body.PlayerHint, day, string(wordsJSON)); err != nil {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}

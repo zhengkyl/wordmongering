@@ -3,20 +3,16 @@ import { cl } from "../lib/cl";
 
 interface Props {
   day: number;
-  firstScore: number;
   bestScore: number;
   lastScore: number;
   plays: number;
 }
 
-export function ScoreDistribution({ day, firstScore, bestScore, lastScore, plays }: Props) {
-  const [globalData, setGlobalData] = useState<{
-    allPlays: Record<number, number>;
-    firstPlays: Record<number, number>;
-  } | null>(null);
+export function ScoreDistribution({ day, bestScore, lastScore }: Props) {
+  const [globalData, setGlobalData] = useState<Record<number, number> | null>(null);
 
   useEffect(() => {
-    fetch(`/api/dailies/${day}/results`, {
+    fetch(`/api/solves/${day}`, {
       signal: AbortSignal.timeout(5000),
     })
       .then((r) => r.json())
@@ -25,32 +21,17 @@ export function ScoreDistribution({ day, firstScore, bestScore, lastScore, plays
   }, [day]);
 
   const [errorMsg, setErrorMsg] = useState("");
-  const [filterFirst, setFilterFirst] = useState(plays === 1);
 
   return (
-    <div class="flex flex-col gap-4 p-4 rounded-xl bg-orange-100 min-h-24">
+    <div class="flex flex-col gap-4 p-4 rounded-xl bg-background min-h-24">
       <div class="flex items-center justify-between">
         <div class="font-semibold">Everyone's scores</div>
-        <div class="flex text-xs">
-          <button
-            class={cl(["btn-tab", filterFirst && "btn-tab-active"])}
-            onClick={() => setFilterFirst(true)}
-          >
-            First plays
-          </button>
-          <button
-            class={cl(["btn-tab", !filterFirst && "btn-tab-active"])}
-            onClick={() => setFilterFirst(false)}
-          >
-            All
-          </button>
-        </div>
       </div>
       {globalData ? (
         <ScoreChart
-          primaryScore={filterFirst ? firstScore : lastScore}
-          secondaryScore={!filterFirst && lastScore !== bestScore ? bestScore : undefined}
-          data={filterFirst ? globalData.firstPlays : globalData.allPlays}
+          primaryScore={lastScore}
+          secondaryScore={lastScore !== bestScore ? bestScore : undefined}
+          data={globalData}
         />
       ) : errorMsg ? (
         <div class="text-red-600">Failed to load scores.</div>
@@ -74,6 +55,7 @@ function ScoreChart({ data, primaryScore, secondaryScore }: ChartProps) {
   const bars = max - min + 1;
 
   const maxCount = Object.values(data).reduce((max, curr) => (curr > max ? curr : max), 0);
+  const total = Object.values(data).reduce((sum, curr) => sum + curr, 0);
 
   return (
     <ol start={min} class="flex flex-col gap-2 text-sm list-decimal pl-4">
@@ -94,7 +76,7 @@ function ScoreChart({ data, primaryScore, secondaryScore }: ChartProps) {
             >
               {isPrimary && <span class="mr-auto">You</span>}
               {isSecondary && <span class="mr-auto">You (best)</span>}
-              {count}
+              {Math.round((count / total) * 100)}%
             </div>
           </li>
         );

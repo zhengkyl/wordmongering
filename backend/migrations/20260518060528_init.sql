@@ -1,18 +1,13 @@
 -- +goose Up
-CREATE TABLE puzzles (
-    day INTEGER PRIMARY KEY AUTOINCREMENT,
-    puzzle TEXT NOT NULL
-);
-
-CREATE TABLE results (
+CREATE TABLE solves (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_hint TEXT NOT NULL,
-    day INTEGER NOT NULL REFERENCES puzzles(day),
+    puzzle_id INTEGER NOT NULL,
     words TEXT NOT NULL,
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
-CREATE INDEX results_day ON results(day);
+CREATE INDEX solves_puzzle_id ON solves(puzzle_id);
 
 CREATE TABLE reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,7 +18,6 @@ CREATE TABLE reports (
 );
 
 -- +goose Down
+DROP INDEX solves_puzzle_id;
+DROP TABLE solves;
 DROP TABLE reports;
-DROP INDEX results_day;
-DROP TABLE results;
-DROP TABLE puzzles;

@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
-import { useDictionary } from "../components/DictionaryContext";
 import { Game } from "../components/Game";
 import { PageLayout } from "../components/PageLayout";
+import { useWords } from "../components/WordsContext";
 
 // prettier-ignore
 const LETTER_POOL = Object.entries({
@@ -20,14 +20,14 @@ function randomLetters(n: number): string[] {
 }
 
 export function EndlessGamePage() {
-  const dictionary = useDictionary();
+  const { words } = useWords();
   const [puzzle] = useState(() => randomLetters(12).join(""));
 
   return (
     <PageLayout noVerticalPadding>
-      {dictionary !== null && (
+      {words !== null && (
         <Game
-          dictionary={dictionary}
+          words={words}
           puzzle={puzzle}
           extraTilesOnTurn={(turn) => (turn % 3 === 0 ? randomLetters(12) : [])}
         />

@@ -18,13 +18,13 @@ Try it out at [wordmongering.com](https://wordmongering.com)
 - cerberus
 - hydra
 
-## Dictionary
+## Words
 
-`dictionary.txt` is based on the [Letterpress word list](https://github.com/lorenbrichter/Words). Changes after 7a08f2f are my own.
+`words.txt` is based on the [Letterpress word list](https://github.com/lorenbrichter/Words). Changes after 7a08f2f are my own.
 
 I am working on adding recent words like "looksmaxxing" and common proper nouns and proper adjectives like "Wednesday".
 
-Also trying to reduce bad entries. It's ~60% garbage, but filtering out false positives is tedious. Goal is for `dictionary.txt` to be 1.4MB (~500kB gzipped), currently 2.8MB (~900kB gzipped).
+Also trying to reduce bad entries. It's ~60% historical garbage, but filtering out false positives is tedious. Goal is for `words.txt` to be 1.4MB (~500kB gzipped), currently 2.8MB (~900kB gzipped).
 
 `super25k.txt` is a semi-hand curated list of words that have a letter superset of popular words from https://www.wordfrequency.info and https://github.com/dolph/dictionary. These are words a native speaker can reasonably be expected to know and represent near-optimal plays (i.e, almost all top 25k popular words are a letter subset of some word in this list).
 
@@ -35,15 +35,28 @@ Make sure to access development site via vite's port (probably localhost:5173). 
 ```sh
 make install
 
-# This starts client (vite) and backend server.
+# vite dev server, proxied go backend, accessible on lan
 make dev
+
+# admin tui
+make dash
 ```
 
 ## Deploy
 
+The gameplay is self-contained in `client`. Just build the static files.
+
+```sh
+git clone https://github.com/zhengkyl/wordmongering
+cd client
+pnpm build
+```
+
+### Backend for Score tracking + Feedback
+
 The server listens at `localhost:2704`. It expects the `X-Real-IP` header for rate-limiting.
 
-### Docker Compose
+#### From image
 
 ```sh
 # Download compose.yaml
@@ -52,24 +65,21 @@ curl -O https://raw.githubusercontent.com/zhengkyl/wordmongering/refs/heads/auth
 # Start server
 docker compose up -d
 
-# Open admin tui
+# admin tui
 docker exec -it <container_id_or_name> dash
 ```
 
-### From source
+#### From source
 
 ```sh
 git clone https://github.com/zhengkyl/wordmongering
-
 cd wordmongering
-
 make install
-
 make build
 
 # Start server
-make start
+STATIC_DIR=client/dist DB_PATH=data/app.db PORT=2704 ./bin/server
 
-# Open admin tui
-make start-dash
+# admin tui
+STATIC_DIR=client/dist DB_PATH=data/app.db ./bin/dash
 ```

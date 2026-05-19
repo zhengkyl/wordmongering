@@ -26,8 +26,10 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
 
   return (
     <>
-      <div class="grid grid-cols-3 gap-2 text-center mt-16">
-        <div class="font-bold text-2xl col-span-3">Congratulations!</div>
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="font-bold text-2xl col-span-3">
+          You won in {gameResult.lastPlay.length} moves!
+        </div>
         {streaks && (
           <>
             <div>
@@ -78,7 +80,6 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
       </div>
       <ScoreDistribution
         day={day}
-        firstScore={gameResult.firstScore}
         bestScore={gameResult.bestScore}
         lastScore={gameResult.lastPlay.length}
         plays={gameResult.plays}

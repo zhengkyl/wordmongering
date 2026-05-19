@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [preact(), UnoCSS()],
   server: {
     proxy: {
-      "/api": `http://localhost:${process.env.PORT ?? 2704}`,
+      "/api": `http://localhost:${process.env.API_PORT ?? 2704}`,
     },
   },
 });

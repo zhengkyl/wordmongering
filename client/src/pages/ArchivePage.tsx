@@ -110,7 +110,7 @@ function MonthCalendar({ year, month, firstDayOfWeek, daysInMonth, puzzleDays }:
           return (
             <Link
               key={dayOfMonth}
-              href={`/daily/${info.puzzleDay}`}
+              href={`/puzzles/${info.puzzleDay}`}
               class={cl([
                 "h-12 flex items-center justify-center @hover:bg-stone-200",
                 info.completed && " bg-green-100 text-green-700",

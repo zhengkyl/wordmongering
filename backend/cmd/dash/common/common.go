@@ -19,8 +19,9 @@ func DayToDate(day int) time.Time {
 }
 
 type Global struct {
-	DB     *sql.DB
-	KeyMap keymap.KeyMap
+	DB         *sql.DB
+	KeyMap     keymap.KeyMap
+	PuzzlePath string
 }
 
 type Props struct {

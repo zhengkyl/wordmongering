@@ -46,12 +46,16 @@ func run(ctx context.Context) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	root, ok := os.LookupEnv("ROOT")
-	if !ok {
-		root = ".."
+	staticDir := os.Getenv("STATIC_DIR")
+	if staticDir == "" {
+		return fmt.Errorf("STATIC_DIR not set")
+	}
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		return fmt.Errorf("DB_PATH not set")
 	}
 
-	db, err := setupDB(filepath.Join(root, "data/app.db"))
+	db, err := setupDB(dbPath)
 	if err != nil {
 		return err
 	}
@@ -63,17 +67,16 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	api, err := newApiHandler(db, root, base64.StdEncoding.EncodeToString(pepperBytes))
+	api, err := newApiHandler(db, staticDir, base64.StdEncoding.EncodeToString(pepperBytes))
 	if err != nil {
 		return err
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("GET /api/dailies/{day}/puzzle", rateLimitMiddleware(api.handleGetPuzzle, 1000))
-	mux.Handle("GET /api/dailies/{day}/results", rateLimitMiddleware(api.handleGetResults, 100))
-	mux.Handle("POST /api/dailies/{day}/results", rateLimitMiddleware(api.handlePostResults, 10))
+	mux.Handle("GET /api/solves/{day}", rateLimitMiddleware(api.handleGetSolves, 100))
+	mux.Handle("POST /api/solves/{day}", rateLimitMiddleware(api.handlePostSolves, 10))
 	mux.Handle("POST /api/reports", rateLimitMiddleware(api.handlePostMissingWord, 10))
-	mux.Handle("/", newSpaHandler(filepath.Join(root, "client/dist")))
+	mux.Handle("/", newSpaHandler(staticDir))
 
 	var handler http.Handler = mux
 	handler = logMiddleware(handler)

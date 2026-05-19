@@ -20,9 +20,10 @@ RUN apk add --no-cache sqlite
 WORKDIR /app
 COPY --from=go-builder /bin/server /bin/server
 COPY --from=go-builder /bin/dash /bin/dash
-COPY --from=client-builder /app/dist ./client/dist
+COPY --from=client-builder /app/dist /app/dist
+ENV STATIC_DIR=/app/dist
+ENV DB_PATH=/app/data/app.db
 ARG PORT=2704
 ENV PORT=$PORT
 EXPOSE $PORT
-ENV ROOT=/app
 CMD ["/bin/server"]

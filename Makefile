@@ -1,31 +1,27 @@
-.PHONY: dev dev-dash build install start start-dash addword addwords
+.PHONY: dev dash build install addword addwords
 
 DEV_PORT ?= 3000
-PORT ?= 2704
+API_PORT ?= 2704
+STATIC_DIR ?= $(CURDIR)/client/public
+DB_PATH ?= $(CURDIR)/data/app.db
 
 install:
 	cd client && pnpm install
 	cd backend && go mod download
 
 dev:
-	trap 'kill 0' EXIT; cd client && PORT=$(PORT) pnpm dev --port $(DEV_PORT) --host & cd backend && PORT=$(PORT) go run .
+	trap 'kill 0' EXIT; cd client && API_PORT=$(API_PORT) pnpm dev --port $(DEV_PORT) --host & cd backend && STATIC_DIR=$(STATIC_DIR) DB_PATH=$(DB_PATH) PORT=$(API_PORT) go run .
 
-dev-dash:
-	ROOT=$(CURDIR) DEBUG=1 cd backend && go run ./cmd/dash
+dash:
+	cd backend && STATIC_DIR=$(STATIC_DIR) DB_PATH=$(DB_PATH) go run ./cmd/dash
 
 build:
 	cd client && pnpm build
 	cd backend && go build -o ../bin/server .
 	cd backend && go build -o ../bin/dash ./cmd/dash
 
-start:
-	./bin/server
-
-start-dash:
-	./bin/dash
-
 addword:
-	echo "$(w)" | sort -mu - client/public/dictionary.txt -o client/public/dictionary.txt
+	echo "$(w)" | sort -mu - $(STATIC_DIR)/words.txt -o $(STATIC_DIR)/words.txt
 
 addwords:
-	sort "$(f)" | sort -mu - client/public/dictionary.txt -o client/public/dictionary.txt
+	sort "$(f)" | sort -mu - $(STATIC_DIR)/words.txt -o $(STATIC_DIR)/words.txt

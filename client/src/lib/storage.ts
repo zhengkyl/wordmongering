@@ -20,7 +20,9 @@ function getAllResults(): AllResults {
   const raw = localStorage.getItem(RESULTS_KEY);
   if (!raw) return {};
   const parsed = JSON.parse(raw);
-  if (!("_v" in parsed)) return {};
+  if (!("_v" in parsed) || parsed._v !== RESULTS_VERSION) {
+    return {};
+  }
   return (parsed as { _v: number; data: AllResults }).data;
 }
 
@@ -51,7 +53,9 @@ function getPlayRecord(): PlayRecord {
   const raw = localStorage.getItem(STREAKS_KEY);
   if (!raw) return {};
   const parsed = JSON.parse(raw);
-  if (!("_v" in parsed)) return {};
+  if (!("_v" in parsed) || parsed._v !== STREAKS_VERSION) {
+    return {};
+  }
   return (parsed as { _v: number; data: PlayRecord }).data;
 }
 

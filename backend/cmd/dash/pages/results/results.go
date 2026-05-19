@@ -16,7 +16,7 @@ import (
 type resultRow struct {
 	id         int
 	playerHint string
-	day        int
+	puzzleId   int
 	words      []string
 	createdAt  int64
 }
@@ -32,12 +32,12 @@ func loadMoreResults(db *sql.DB, dayFilter, offset int) tea.Cmd {
 		)
 		if dayFilter == 0 {
 			rows, err = db.Query(
-				"SELECT id, player_hint, day, words, created_at FROM results ORDER BY id DESC LIMIT ? OFFSET ?",
+				"SELECT id, player_hint, puzzle_id, words, created_at FROM solves ORDER BY id DESC LIMIT ? OFFSET ?",
 				common.PageSize, offset,
 			)
 		} else {
 			rows, err = db.Query(
-				"SELECT id, player_hint, day, words, created_at FROM results WHERE day = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+				"SELECT id, player_hint, puzzle_id, words, created_at FROM solves WHERE puzzle_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
 				dayFilter, common.PageSize, offset,
 			)
 		}
@@ -49,7 +49,7 @@ func loadMoreResults(db *sql.DB, dayFilter, offset int) tea.Cmd {
 		for rows.Next() {
 			var r resultRow
 			var wordsJSON string
-			rows.Scan(&r.id, &r.playerHint, &r.day, &wordsJSON, &r.createdAt)
+			rows.Scan(&r.id, &r.playerHint, &r.puzzleId, &wordsJSON, &r.createdAt)
 			json.Unmarshal([]byte(wordsJSON), &r.words)
 			results = append(results, r)
 		}
@@ -166,7 +166,7 @@ func (m *Model) View() string {
 
 		var dayPart string
 		if m.dayFilter == 0 {
-			dayPart = fmt.Sprintf("Day %-4d", r.day)
+			dayPart = fmt.Sprintf("Day %-4d", r.puzzleId)
 		} else {
 			dayPart = fmt.Sprintf("%d words", len(r.words))
 		}
