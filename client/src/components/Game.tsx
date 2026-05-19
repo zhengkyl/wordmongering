@@ -131,16 +131,15 @@ export function Game({
 
     const greenCount = matched.length;
     if (greenCount === 0) {
-      triggerError(`Must contain '${tiles[0].letter.toUpperCase()}'`);
+      triggerError(`Must contain '${tiles[0].letter}'`);
       return;
     }
 
-    const word = input.toLowerCase();
-    if (usedWordsRef.current.includes(word)) {
+    if (usedWordsRef.current.includes(input)) {
       triggerError("Cannot repeat words");
       return;
     }
-    if (!words.has(word)) {
+    if (!words.has(input)) {
       triggerError("Not in word list");
       return;
     }
@@ -153,9 +152,9 @@ export function Game({
       letter,
     }));
 
-    usedWordsRef.current.push(word);
+    usedWordsRef.current.push(input);
 
-    if (word === "wordmongering") {
+    if (input === "WORDMONGERING") {
       setCelebrating(true);
       playHorn();
       await sleep(3200);
@@ -291,7 +290,7 @@ export function Game({
                     d="M50 0c43 0 50 7 50 50s-7 50-50 50S0 93 0 50 7 0 50 0"
                   />
                 </svg>
-                <div class="absolute inset-0 flex justify-center items-center font-bold text-2xl uppercase">
+                <div class="absolute inset-0 flex justify-center items-center font-bold text-2xl">
                   {letter}
                 </div>
               </div>
@@ -334,7 +333,7 @@ export function Game({
                 initAudio();
                 const newInput = (e.target as HTMLInputElement).value.trim();
                 prevMatchedCountRef.current = matched.length;
-                setInput(newInput);
+                setInput(newInput.toUpperCase());
                 setErrorMsg(null);
               }}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}

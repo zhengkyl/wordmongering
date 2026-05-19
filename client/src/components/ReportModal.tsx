@@ -21,7 +21,7 @@ export function ReportModal({ word, onClose }: { word: string; onClose: () => vo
     <Modal title="Report missing word" onClose={onClose}>
       <div>
         <p class="text-xs text-gray-500 mb-1">Word</p>
-        <p class="font-bold uppercase text-2xl">{word}</p>
+        <p class="font-bold text-2xl">{word}</p>
       </div>
       <textarea
         class="w-full rounded-lg px-3 py-2 text-sm resize-none bg-orange-100"

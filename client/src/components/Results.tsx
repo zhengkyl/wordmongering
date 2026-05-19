@@ -65,7 +65,7 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
           Menu
         </Link>
         <button class="btn btn-orange" onClick={onPlayAgain}>
-          Replay
+          Play again
         </button>
         <button
           class="justify-self-center btn btn-ghost"
@@ -78,7 +78,7 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
             );
             const shareText = [
               "wordmongering.com",
-              `#${day} - ${moves.length}/${puzzle.length}`,
+              `#${day} - ${moves.length}/10`,
               ...turns,
             ].join("\n");
             window.navigator.clipboard.writeText(shareText);
@@ -102,7 +102,7 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
           {moves.map(({ word, indexes, rating, optimalMoves, puzzleState }, i) => (
             <li key={i} class="group">
               <div class="flex justify-between flex-wrap gap-2">
-                <div class="font-bold uppercase">
+                <div class="font-bold">
                   <WordTiles
                     word={word}
                     indexes={indexes}
@@ -116,19 +116,17 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
                 <details>
                   <summary
                     class={cl([
-                      "px-1.5 py-0.5 rounded cursor-pointer [&::-webkit-details-marker]:hidden",
-                      rating === "blunder"
-                        ? "text-red-600 font-semibold"
-                        : rating === "weak"
-                          ? "text-orange-700 font-semibold"
-                          : "text-stone-500 opacity-50 focus-visible:opacity-100 @hover:opacity-100 transition-opacity",
+                      "px-1.5 py-0.5 cursor-pointer [&::-webkit-details-marker]:hidden focus-visible:opacity-100 @hover:opacity-100 transition-opacity select-none",
+                      rating === "blunder" || rating === "weak"
+                          ? "text-red-800 font-semibold opacity-80 "
+                          : "text-stone-500 opacity-50 ",
                     ])}
                   >
                     Reveal best move
                   </summary>
                   <div class="text-sm p-2 bg-orange-100">
                     <div>Puzzle</div>
-                    <div class="font-bold uppercase">
+                    <div class="font-bold">
                       <PuzzleTiles
                         word={puzzleState}
                         userClass="bg-lime-300"
@@ -138,7 +136,7 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
                       />
                     </div>
                     <div>Moves</div>
-                    <ul class="font-bold uppercase flex flex-col gap-2">
+                    <ul class="font-bold flex flex-col gap-2">
                       {optimalMoves.map(({ word, indexes }, j) => (
                         <li key={j}>
                           <WordTiles
@@ -226,7 +224,7 @@ const ANNOTATION: Record<NonNullable<Rating>, { label: string; cls: string }> = 
 function MoveAnnotation({ rating }: { rating: Rating }) {
   if (!rating) return null;
   const { label, cls } = ANNOTATION[rating];
-  return <span class={`px-1.5 py-0.5 rounded text-sm font-semibold ${cls}`}>{label}</span>;
+  return <span class={cl(["px-1.5 py-0.5 text-sm font-semibold select-none", cls])}>{label}</span>;
 }
 
 function rateMove(cleared: number, nearOptimal: number): Rating {
