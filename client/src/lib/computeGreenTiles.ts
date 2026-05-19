@@ -28,22 +28,25 @@ export function puzzleMatchedTiles(puzzleTiles: PuzzleTile[], input: string) {
 export function sampleOptimalMoves(puzzle: string, words: string[], sampleSize: number) {
   let matched = 1;
   let sample: { word: string; indexes: number[] }[] = [];
-
-  words.forEach((word, i) => {
+  let seen = 0;
+  
+  for (const word of words) {
     const indexes = inputMatchedIndexes(puzzle, word);
     const count = indexes.length;
     if (count > matched) {
       matched = count;
       sample = [{ word, indexes }];
+      seen = 1
     } else if (count === matched) {
+      seen++
       if (sample.length < sampleSize) {
         sample.push({ word, indexes });
       } else {
-        const j = Math.floor(Math.random() * i);
+        const j = Math.floor(Math.random() * seen);
         if (j < sampleSize) sample[j] = { word, indexes };
       }
     }
-  });
+  }
   return { matched, sample };
 }
 
