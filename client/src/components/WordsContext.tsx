@@ -4,11 +4,13 @@ import { useContext, useEffect, useState } from "preact/hooks";
 
 const WordsContext = createContext<{
   words: Set<string> | null;
+  superWords: string[] | null;
   puzzles: string[] | null;
-}>({ words: null, puzzles: null });
+}>({ words: null, puzzles: null, superWords: null });
 
 export function WordsProvider({ children }: { children: ComponentChildren }) {
   const [words, setWords] = useState<Set<string> | null>(null);
+  const [superWords, setSuperWords] = useState<string[] | null>(null);
   const [puzzles, setPuzzles] = useState<string[] | null>(null);
 
   useEffect(() => {
@@ -25,9 +27,16 @@ export function WordsProvider({ children }: { children: ComponentChildren }) {
         console.log(text.trim().split("\n"));
         setPuzzles(text.trim().split("\n"));
       });
+    fetch("/super25k.txt")
+      .then((r) => r.text())
+      .then((text) => {
+        setSuperWords(text.trim().split("\n"));
+      });
   }, []);
 
-  return <WordsContext.Provider value={{ words, puzzles }}>{children}</WordsContext.Provider>;
+  return (
+    <WordsContext.Provider value={{ words, puzzles, superWords }}>{children}</WordsContext.Provider>
+  );
 }
 
 export function useWords() {

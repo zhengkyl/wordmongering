@@ -1,8 +1,10 @@
+import { useMemo } from "preact/hooks";
 import { Link } from "wouter-preact";
 import { cl } from "../lib/cl";
-import { inputUsedIndexes } from "../lib/computeGreenTiles";
+import { inputMatchedIndexes, sampleOptimalMoves } from "../lib/computeGreenTiles";
 import { type GameResult } from "../lib/storage";
 import { ScoreDistribution } from "./ScoreDistribution";
+import { useWords } from "./WordsContext";
 
 interface Props {
   day: number;
@@ -13,16 +15,29 @@ interface Props {
 }
 
 export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props) {
-  let tempPuzzle = puzzle;
-  const wordsTiles = gameResult.lastPlay.map((word) => {
-    const indexes = inputUsedIndexes(tempPuzzle, word);
-    tempPuzzle = tempPuzzle.slice(indexes.length);
-    const tiles: { letter: string; green: boolean }[] = [];
-    for (let i = 0; i < word.length; i++) {
-      tiles.push({ letter: word.charAt(i), green: indexes.includes(i) });
-    }
-    return tiles;
-  });
+  const { superWords } = useWords();
+  const moves = useMemo(() => {
+    let tempPuzzle = puzzle;
+    return gameResult.lastPlay.map((word) => {
+      const indexes = inputMatchedIndexes(tempPuzzle, word);
+
+      let rating;
+      let optimalMoves;
+      if (superWords) {
+        const result = sampleOptimalMoves(tempPuzzle, superWords, 5);
+        rating = rateMove(indexes.length, result.matched);
+        optimalMoves = result.sample;
+      } else {
+        rating = null;
+        optimalMoves = null;
+      }
+
+      const puzzleState = tempPuzzle;
+      tempPuzzle = tempPuzzle.slice(indexes.length);
+
+      return { word, indexes, rating, optimalMoves, puzzleState };
+    });
+  }, [puzzle, gameResult.lastPlay, superWords]);
 
   return (
     <>
@@ -55,12 +70,15 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
         <button
           class="justify-self-center btn btn-ghost"
           onClick={() => {
-            const turns = wordsTiles.map((tiles) =>
-              tiles.map((t) => (t.green ? "🟩" : "⬜")).join(""),
+            const turns = moves.map(({ word, indexes }) =>
+              word
+                .split("")
+                .map((_, i) => (indexes.includes(i) ? "🟩" : "⬜"))
+                .join(""),
             );
             const shareText = [
               "wordmongering.com",
-              `#${day} - ${wordsTiles.length}/${puzzle.length}`,
+              `#${day} - ${moves.length}/${puzzle.length}`,
               ...turns,
             ].join("\n");
             window.navigator.clipboard.writeText(shareText);
@@ -78,37 +96,152 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
           </svg>
         </button>
       </div>
+      <div class="rounded-xl bg-background mb-4">
+        <div class="font-semibold p-4">Your moves</div>
+        <ul class="flex flex-col gap-2 list-decimal p-4 pt-0 pl-8">
+          {moves.map(({ word, indexes, rating, optimalMoves, puzzleState }, i) => (
+            <li key={i} class="group">
+              <div class="flex justify-between flex-wrap gap-2">
+                <div class="font-bold uppercase">
+                  <WordTiles
+                    word={word}
+                    indexes={indexes}
+                    letterClass="w-6"
+                    matchedClass="bg-lime-300"
+                  />
+                </div>
+                <MoveAnnotation rating={rating} />
+              </div>
+              {optimalMoves && (
+                <details>
+                  <summary
+                    class={cl([
+                      "px-1.5 py-0.5 rounded cursor-pointer [&::-webkit-details-marker]:hidden",
+                      rating === "blunder"
+                        ? "text-red-600 font-semibold"
+                        : rating === "weak"
+                          ? "text-orange-700 font-semibold"
+                          : "text-stone-500 opacity-50 focus-visible:opacity-100 @hover:opacity-100 transition-opacity",
+                    ])}
+                  >
+                    Reveal best move
+                  </summary>
+                  <div class="text-sm p-2 bg-orange-100">
+                    <div>Puzzle</div>
+                    <div class="font-bold uppercase">
+                      <PuzzleTiles
+                        word={puzzleState}
+                        userClass="bg-lime-300"
+                        optimalClass="bg-teal-300"
+                        userMatched={indexes.length}
+                        optimalMatched={optimalMoves[0].indexes.length}
+                      />
+                    </div>
+                    <div>Moves</div>
+                    <ul class="font-bold uppercase flex flex-col gap-2">
+                      {optimalMoves.map(({ word, indexes }, j) => (
+                        <li key={j}>
+                          <WordTiles
+                            word={word}
+                            indexes={indexes}
+                            letterClass="w-4"
+                            matchedClass="bg-teal-300"
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </details>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
       <ScoreDistribution
         day={day}
         bestScore={gameResult.bestScore}
         lastScore={gameResult.lastPlay.length}
         plays={gameResult.plays}
       />
-      <details class="group rounded-xl bg-orange-100 mb-4" open>
-        <summary class="font-semibold cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex justify-between items-center p-4">
-          Your moves
-          <span class="inline-block transition-transform group-open:-rotate-90">{"<"}</span>
-        </summary>
-        <ul class="flex flex-col gap-2 list-decimal p-4 pt-0 pl-8">
-          {wordsTiles.map((tiles, i) => (
-            <li key={i}>
-              <div class="font-bold uppercase">
-                {tiles.map(({ letter, green }, j) => (
-                  <div
-                    key={j}
-                    class={cl([
-                      "inline-block w-6 text-center",
-                      green ? "bg-green-300" : "bg-orange-200",
-                    ])}
-                  >
-                    <span class="vertical-middle">{letter}</span>
-                  </div>
-                ))}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </details>
     </>
   );
+}
+
+function PuzzleTiles({
+  word,
+  userClass,
+  optimalClass,
+  userMatched,
+  optimalMatched,
+}: {
+  word: string;
+  userClass: string;
+  optimalClass: string;
+  userMatched: number;
+  optimalMatched: number;
+}) {
+  return word.split("").map((letter, i) => (
+    <span
+      key={i}
+      class={cl([
+        "inline-block text-center w-4",
+        i < userMatched ? userClass : i < optimalMatched ? optimalClass : null,
+      ])}
+    >
+      {letter}
+    </span>
+  ));
+}
+
+function WordTiles({
+  word,
+  indexes,
+  letterClass,
+  matchedClass,
+}: {
+  word: string;
+  indexes: number[];
+  letterClass: string;
+  matchedClass: string;
+}) {
+  return word.split("").map((letter, i) => (
+    <span
+      key={i}
+      class={cl(["inline-block text-center", letterClass, indexes.includes(i) ? matchedClass : ""])}
+    >
+      {letter}
+    </span>
+  ));
+}
+
+type Rating = "brilliant" | "strong" | "weak" | "blunder" | null;
+
+const ANNOTATION: Record<NonNullable<Rating>, { label: string; cls: string }> = {
+  brilliant: { label: "Brilliant!!", cls: "bg-teal-200 text-teal-800" },
+  strong: { label: "Strong!", cls: "bg-green-200 text-green-800" },
+  weak: { label: "Weak?", cls: "bg-orange-200 text-orange-800" },
+  blunder: { label: "Blunder??", cls: "bg-red-200 text-red-800" },
+};
+
+function MoveAnnotation({ rating }: { rating: Rating }) {
+  if (!rating) return null;
+  const { label, cls } = ANNOTATION[rating];
+  return <span class={`px-1.5 py-0.5 rounded text-sm font-semibold ${cls}`}>{label}</span>;
+}
+
+function rateMove(cleared: number, nearOptimal: number): Rating {
+  if (cleared >= nearOptimal) {
+    if (cleared >= 6) return "brilliant";
+  }
+  if (cleared >= nearOptimal - 1) {
+    if (cleared >= 5) return "strong";
+  }
+
+  if (cleared <= nearOptimal - 4) {
+    if (cleared <= 2) return "blunder";
+  }
+  if (cleared <= nearOptimal - 3) {
+    if (cleared <= 3) return "weak";
+  }
+  return null;
 }

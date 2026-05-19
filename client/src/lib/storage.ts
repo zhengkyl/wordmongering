@@ -5,9 +5,9 @@ type AllResults = Record<string, GameResult>;
 type PlayRecord = Record<number, [number, number]>;
 
 const RESULTS_KEY = "wm_results";
-const RESULTS_VERSION = 1;
+const RESULTS_VERSION = 2;
 const STREAKS_KEY = "wm_streaks";
-const STREAKS_VERSION = 1;
+const STREAKS_VERSION = 2;
 
 export type GameResult = {
   firstScore: number;

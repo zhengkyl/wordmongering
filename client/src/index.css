@@ -67,15 +67,6 @@ body {
   pointer-events: none;
 }
 
-@keyframes match-green {
-  to {
-    fill: #86efac;
-  }
-}
-.match-green {
-  animation: match-green 1ms linear forwards;
-}
-
 @keyframes shake {
   0%,
   100% {

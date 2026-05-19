@@ -15,3 +15,7 @@
 - Do not run build or type checking commands.
 - Use `uv` and/or `python3`
 - Do not run build or type checking commands.
+
+- Add helper components to the end of the file. Make sure only mission critical info is at the top, like constants and the main exported component.
+
+- Do not remove TODO comments

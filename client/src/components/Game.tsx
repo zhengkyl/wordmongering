@@ -68,8 +68,6 @@ export function Game({
 
   const [reportWord, setReportWord] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(true);
-  const [helpPage, setHelpPage] = useState(0);
 
   useEffect(() => {
     function refocusOnType(e: KeyboardEvent) {
@@ -230,7 +228,6 @@ export function Game({
           const { x, y } = positions[index + tileOffset];
           const isPopping = poppingCount !== null && index < poppingCount;
           const isMatched = matched.includes(id);
-          const isNewlyMatched = isMatched && index >= prevMatchedCountRef.current;
           const isFirstMoving =
             (phase.type === "adding" && index === phase.addedAt) ||
             (phase.type === "sliding" && index === 0);
@@ -285,20 +282,11 @@ export function Game({
                 >
                   <path
                     class={
-                      isNewlyMatched
-                        ? "match-green fill-orange-200"
-                        : isMatched
-                          ? "fill-green-300"
-                          : candidates.includes(id)
-                            ? "fill-orange-300"
-                            : "fill-orange-200"
-                    }
-                    style={
-                      isNewlyMatched
-                        ? {
-                            animationDelay: `${(index - prevMatchedCountRef.current) * 30}ms`,
-                          }
-                        : undefined
+                      isMatched
+                        ? "fill-lime-300"
+                        : candidates.includes(id)
+                          ? "fill-orange-300"
+                          : "fill-orange-200"
                     }
                     d="M50 0c43 0 50 7 50 50s-7 50-50 50S0 93 0 50 7 0 50 0"
                   />
@@ -383,7 +371,7 @@ export function Game({
             <span>{errorMsg}</span>
             {errorMsg === "Not in word list" && (
               <button
-                class="underline text-red-400 hover:text-red-600"
+                class="underline text-red-400 @hover:text-red-600"
                 onClick={() => setReportWord(input)}
               >
                 Report missing word

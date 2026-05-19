@@ -11,8 +11,8 @@ export function DayDisplay({
 }) {
   const formattedDate = getDayFormattedDate(day);
   return (
-    <div class={outerClass} style={{ viewTransitionName: "daily-date", animation }}>
-      <div class="font-bold leading-none text-4xl whitespace-pre">{formattedDate}</div>
+    <div class={outerClass} style={{ viewTransitionName: "puzzle-date", animation }}>
+      <div class="font-bold leading-none text-2xl whitespace-pre">{formattedDate}</div>
     </div>
   );
 }
