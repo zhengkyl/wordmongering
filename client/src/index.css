@@ -114,3 +114,11 @@ svg[data-lucide] {
   stroke-width: 8;
   stroke-linecap: round;
 }
+
+/* doesn't work safari */
+li.dotless::marker {
+  content: counter(list-item) "  "; /* Replaces "1." with "1 " */
+}
+summary::marker {
+  font-size: 12px; /* Resize the arrow */
+}

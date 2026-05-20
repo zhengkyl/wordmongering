@@ -1,8 +1,8 @@
 import { useMemo } from "preact/hooks";
-import { Link } from "wouter-preact";
 import { cl } from "../lib/cl";
 import { inputMatchedIndexes, sampleOptimalMoves } from "../lib/computeGreenTiles";
 import { type GameResult } from "../lib/storage";
+import { ScoreDisplay } from "./DayDisplay";
 import { ScoreDistribution } from "./ScoreDistribution";
 import { useWords } from "./WordsContext";
 
@@ -18,20 +18,24 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
   const { superWords } = useWords();
   const moves = useMemo(() => {
     let tempPuzzle = puzzle;
-    return gameResult.lastPlay.map((word) => {
+    return gameResult.lastPlay.map((word, i) => {
       const indexes = inputMatchedIndexes(tempPuzzle, word);
 
-      let rating;
-      let optimalMoves;
-      if (superWords) {
+      let rating: Rating = null;
+      let optimalMoves = null;
+      if (i === gameResult.lastPlay.length - 1) {
+        if (indexes.length >= 6) {
+          rating = "brilliant"
+        } else if (indexes.length >= 5) {
+          rating = "strong"
+        }
+      } else if (superWords) {
         const result = sampleOptimalMoves(tempPuzzle, superWords, 5);
         rating = rateMove(indexes.length, result.matched);
-        optimalMoves = result.sample;
-      } else {
-        rating = null;
-        optimalMoves = null;
+        if (indexes.length !== result.matched) {
+          optimalMoves = result.sample;
+        }
       }
-
       const puzzleState = tempPuzzle;
       tempPuzzle = tempPuzzle.slice(indexes.length);
 
@@ -41,34 +45,13 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
 
   return (
     <>
+      <ScoreDisplay result={gameResult} />
       <div class="grid grid-cols-3 gap-2 text-center">
-        <div class="font-bold text-2xl col-span-3">
-          You won in {gameResult.lastPlay.length} moves!
-        </div>
-        {streaks && (
-          <>
-            <div>
-              <div class="font-bold text-2xl">{streaks.daysPlayed}</div>
-              <div class="text-sm text-gray-500">Days Played</div>
-            </div>
-            <div>
-              <div class="font-bold text-2xl">{streaks.currentStreak}</div>
-              <div class="text-sm text-gray-500">Current Streak</div>
-            </div>
-            <div>
-              <div class="font-bold text-2xl">{streaks.bestStreak}</div>
-              <div class="text-sm text-gray-500">Best Streak</div>
-            </div>
-          </>
-        )}
-        <Link href="/" class="justify-self-center btn btn-ghost">
-          Menu
-        </Link>
-        <button class="btn btn-orange" onClick={onPlayAgain}>
+        <button class="btn btn-orange col-span-2" onClick={onPlayAgain}>
           Play again
         </button>
         <button
-          class="justify-self-center btn btn-ghost"
+          class="btn btn-ghost justify-center"
           onClick={() => {
             const turns = moves.map(({ word, indexes }) =>
               word
@@ -96,9 +79,15 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
           </svg>
         </button>
       </div>
-      <div class="rounded-xl bg-background mb-4">
-        <div class="font-semibold p-4">Your moves</div>
-        <ul class="flex flex-col gap-2 list-decimal p-4 pt-0 pl-8">
+      <ScoreDistribution
+        day={day}
+        bestScore={gameResult.bestScore}
+        lastScore={gameResult.lastPlay.length}
+        plays={gameResult.plays}
+      />
+      <div class="rounded-xl bg-background mb-8">
+        <div class="text-lg font-semibold py-2">Your moves</div>
+        <ul class="flex flex-col gap-2 list-decimal pt-0 pl-4">
           {moves.map(({ word, indexes, rating, optimalMoves, puzzleState }, i) => (
             <li key={i} class="group">
               <div class="flex justify-between flex-wrap gap-2">
@@ -112,14 +101,14 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
                 </div>
                 <MoveAnnotation rating={rating} />
               </div>
-              {optimalMoves && (
+              {superWords && (optimalMoves ? (
                 <details>
                   <summary
                     class={cl([
-                      "px-1.5 py-0.5 cursor-pointer [&::-webkit-details-marker]:hidden focus-visible:opacity-100 @hover:opacity-100 transition-opacity select-none",
+                      "py-1 cursor-pointer [&::-webkit-details-marker]:hidden focus-visible:opacity-100 @hover:opacity-100 transition-opacity select-none",
                       rating === "blunder" || rating === "weak"
-                          ? "text-red-800 font-semibold opacity-80 "
-                          : "text-stone-500 opacity-50 ",
+                        ? "text-red-800 font-semibold opacity-80 "
+                        : "text-stone-500 opacity-50",
                     ])}
                   >
                     Reveal best move
@@ -150,17 +139,11 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
                     </ul>
                   </div>
                 </details>
-              )}
+              ) : <div class="pl-2 py-1 text-stone-500 opacity-50 select-none">You played the best move!</div>)}
             </li>
           ))}
         </ul>
       </div>
-      <ScoreDistribution
-        day={day}
-        bestScore={gameResult.bestScore}
-        lastScore={gameResult.lastPlay.length}
-        plays={gameResult.plays}
-      />
     </>
   );
 }
@@ -229,10 +212,10 @@ function MoveAnnotation({ rating }: { rating: Rating }) {
 
 function rateMove(cleared: number, nearOptimal: number): Rating {
   if (cleared >= nearOptimal) {
-    if (cleared >= 6) return "brilliant";
+    return "brilliant";
   }
   if (cleared >= nearOptimal - 1) {
-    if (cleared >= 5) return "strong";
+    return "strong";
   }
 
   if (cleared <= nearOptimal - 4) {

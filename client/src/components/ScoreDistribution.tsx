@@ -23,10 +23,8 @@ export function ScoreDistribution({ day, bestScore, lastScore }: Props) {
   const [errorMsg, setErrorMsg] = useState("");
 
   return (
-    <div class="flex flex-col gap-4 p-4 rounded-xl bg-background min-h-24">
-      <div class="flex items-center justify-between">
-        <div class="font-semibold">Everyone's scores</div>
-      </div>
+    <div class="rounded-xl bg-background min-h-24">
+      <div class="text-lg font-semibold py-2">Everyone's scores</div>
       {globalData ? (
         <ScoreChart
           primaryScore={lastScore}
@@ -50,33 +48,30 @@ interface ChartProps {
 
 function ScoreChart({ data, primaryScore, secondaryScore }: ChartProps) {
   const keys = Object.keys(data).map(Number);
-  const max = keys.reduce((max, curr) => (curr > max ? curr : max), 0);
-  const min = keys.reduce((min, curr) => (curr < min ? curr : min), 999);
+  const max = keys.reduce((max, curr) => (curr > max ? curr : max), Math.max(primaryScore, secondaryScore ?? 0));
+  const min = keys.reduce((min, curr) => (curr < min ? curr : min), Math.min(primaryScore, secondaryScore ?? 999));
   const bars = max - min + 1;
 
-  const maxCount = Object.values(data).reduce((max, curr) => (curr > max ? curr : max), 0);
-  const total = Object.values(data).reduce((sum, curr) => sum + curr, 0);
+  const maxPercent = Object.values(data).reduce((max, curr) => (curr > max ? curr : max), 1);
 
   return (
-    <ol start={min} class="flex flex-col gap-2 text-sm list-decimal pl-4">
+    <ol start={min} class="flex flex-col gap-2 list-decimal pl-4">
       {Array.from({ length: bars }, (_, i) => {
         const words = i + min;
-        const count = data[words] ?? 0;
+        const percent = data[words] ?? 0;
         const isPrimary = words === primaryScore;
         const isSecondary = words === secondaryScore;
-        const pct = Math.round((count / maxCount) * 100);
+        const width = Math.round((percent / maxPercent) * 100);
         return (
-          <li key={i}>
+          <li key={i} class="dotless">
             <div
               class={cl([
-                "h-6 px-2 font-bold text-white text-xs min-w-fit flex items-center justify-end",
-                isPrimary ? "bg-green-500" : isSecondary ? "bg-orange-400" : "bg-stone-400",
+                "h-6 px-2 font-bold text-white text-xs min-w-fit flex items-center gap-2 justify-end",
+                isPrimary ? "bg-lime-500" : isSecondary ? "bg-orange-400" : "bg-stone-400",
               ])}
-              style={{ width: `${pct}%` }}
+              style={{ width: `${width}%` }}
             >
-              {isPrimary && <span class="mr-auto">You</span>}
-              {isSecondary && <span class="mr-auto">You (best)</span>}
-              {Math.round((count / total) * 100)}%
+              {percent}%
             </div>
           </li>
         );

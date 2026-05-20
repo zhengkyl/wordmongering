@@ -1,5 +1,5 @@
 import { Link } from "wouter-preact";
-import { DayDisplay } from "../components/DayDisplay";
+import { DayDisplay, ScoreDisplay } from "../components/DayDisplay";
 import { PageLayout } from "../components/PageLayout";
 import { getDayNumber } from "../lib/daily";
 import { getDayResults } from "../lib/storage";
@@ -54,18 +54,13 @@ export function HomePage() {
     <PageLayout noHeaderLogo>
       <WordTiles />
       <DayDisplay day={dayNumber} class="mx-auto w-fit text-center" />
-      {todayResult && (
-        <div class="text-center text-stone-500 text-sm">
-          Your score:{" "}
-          <span class="font-semibold text-stone-700">{todayResult.bestScore} words</span>
-        </div>
-      )}
+      {todayResult && <ScoreDisplay result={todayResult} />}
       <div class="grid grid-cols-2 gap-2">
         <Link
           href="/puzzles/today"
           class={`btn-lg col-span-2 ${todayResult ? "btn-sec" : "btn-orange spx-12"}`}
         >
-          {todayResult ? "Replay daily puzzle" : "Play daily puzzle"}
+          {todayResult ? "View daily puzzle" : "Play daily puzzle"}
         </Link>
         <Link href="/archive" class="btn btn-sec">
           Past puzzles

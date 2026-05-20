@@ -70,17 +70,15 @@ function GameLoader({ day }: { day: number }) {
           puzzle={puzzle}
           words={words}
           onComplete={(words) => {
-            if (!existingResult) {
-              fetch(`/api/solves/${day}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                signal: AbortSignal.timeout(1000),
-                body: JSON.stringify({
-                  playerHint: getPlayerHint(),
-                  words,
-                }),
-              });
-            }
+            fetch(`/api/solves/${day}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              signal: AbortSignal.timeout(1000),
+              body: JSON.stringify({
+                playerHint: getPlayerHint(),
+                words,
+              }),
+            });
 
             const gameResult = updateDayResults(day, words);
             const streaks = updateStreak(day);
