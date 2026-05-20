@@ -90,7 +90,7 @@ function MonthCalendar({ year, month, firstDayOfWeek, daysInMonth, puzzleDays }:
           <div class="text-xs font-bold text-gray-400 p-1">{h}</div>
         ))}
         {Array.from({ length: firstDayOfWeek }, (_, i) => (
-          <div key={`pad-${i}`} class="aspect-square" />
+          <div key={`pad-${i}`} />
         ))}
         {Array.from({ length: daysInMonth }, (_, i) => {
           const dayOfMonth = i + 1;

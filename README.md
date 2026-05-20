@@ -6,7 +6,10 @@ Try it out at [wordmongering.com](https://wordmongering.com)
 
 ## TODO
 
-- show score and alternate play button if played already
+- favicon
+- homepage logo
+
+- nations/nationalities
 
 - improve tui
 - improve everything else
