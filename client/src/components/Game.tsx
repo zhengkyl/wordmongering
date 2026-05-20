@@ -80,7 +80,9 @@ export function Game({
   }, []);
 
   useLayoutEffect(() => {
-    window.scrollTo(0, document.body.scrollHeight);
+    if (phase.type === "adding" && phase.offset === phase.initialOffset) {
+      window.scrollTo(0, document.body.scrollHeight);
+    }
     setPhase((prev) => {
       if (prev.type !== "adding" || prev.offset !== prev.initialOffset) return prev;
       return { ...prev, offset: prev.offset - 1 };
