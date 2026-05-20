@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -55,7 +55,7 @@ func init() {
 func sortedKey(runes []rune) string {
 	r := make([]rune, len(runes))
 	copy(r, runes)
-	sort.Slice(r, func(i, j int) bool { return r[i] < r[j] })
+	slices.Sort(r)
 	return string(r)
 }
 
@@ -71,7 +71,7 @@ func annotate(pz string) string {
 			marks[i] = ch
 		}
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if i+1 < n {
 			k := sortedKey(runes[i : i+2])
 			if _, ok := dead.no2[k]; ok {
@@ -207,11 +207,11 @@ func InitWords(path string) error {
 		var freq [26]int
 		valid := true
 		for _, c := range w {
-			if c < 'a' || c > 'z' {
+			if c < 'A' || c > 'Z' {
 				valid = false
 				break
 			}
-			freq[c-'a']++
+			freq[c-'A']++
 		}
 		if valid && len(w) > 0 {
 			wordList = append(wordList, w)
@@ -248,7 +248,7 @@ func computeMinSolve(puzzle string) minSolveResult {
 	for i := n - 1; i >= 0; i-- {
 		var seg [26]int
 		for j := i + 1; j <= n; j++ {
-			c := runes[j-1] - 'a'
+			c := runes[j-1] - 'A'
 			if c < 0 || c >= 26 {
 				break
 			}
@@ -263,7 +263,7 @@ func computeMinSolve(puzzle string) minSolveResult {
 			var slotWords []string
 			for wi, wf := range wordFreqs {
 				ok := true
-				for k := 0; k < 26; k++ {
+				for k := range 26 {
 					if wf[k] < seg[k] {
 						ok = false
 						break
