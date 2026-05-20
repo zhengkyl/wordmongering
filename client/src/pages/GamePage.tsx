@@ -17,7 +17,7 @@ export function DailyGamePage() {
   const maxDays = Math.ceil((Date.now() - LOCAL_WM_EPOCH) / MS_PER_DAY);
 
   return (
-    <PageLayout noVerticalPadding>
+    <PageLayout>
       {day > maxDays ? <div>Nothing here yet.</div> : <GameLoader day={day} />}
     </PageLayout>
   );

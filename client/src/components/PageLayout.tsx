@@ -1,22 +1,18 @@
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
-import { Link, useRoute } from "wouter-preact";
-import { cl } from "../lib/cl";
+import { Link } from "wouter-preact";
 import { soundEnabled, toggleSound } from "../lib/sound";
 import { SettingsModal } from "./SettingsModal";
 
 export function PageLayout({
   children,
   noHeaderLogo,
-  noVerticalPadding,
 }: {
   children: ComponentChildren;
   noHeaderLogo?: true;
-  noVerticalPadding?: true;
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [muted, setMuted] = useState(!soundEnabled);
-  const [isHome] = useRoute("/");
   return (
     <>
       <div class="flex justify-between gap-2 p-2 sticky top-0 z-10">
@@ -26,11 +22,11 @@ export function PageLayout({
           style={
             noHeaderLogo
               ? {
-                  visibility: "hidden",
-                }
+                visibility: "hidden",
+              }
               : {
-                  viewTransitionName: "wordmongering-logo",
-                }
+                viewTransitionName: "wordmongering-logo",
+              }
           }
         >
           WORDMONGERING
@@ -71,10 +67,8 @@ export function PageLayout({
         </div>
       </div>
       <div
-        class={cl([
-          "max-w-screen-sm w-full mx-auto px-4 flex-1 flex flex-col gap-8",
-          noVerticalPadding ? "" : "py-16",
-        ])}
+        class="max-w-screen-sm w-full mx-auto px-4 flex-1 flex flex-col gap-4 py-8"
+
       >
         {children}
       </div>

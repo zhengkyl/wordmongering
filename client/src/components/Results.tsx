@@ -15,34 +15,6 @@ interface Props {
 }
 
 export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props) {
-  const { superWords } = useWords();
-  const moves = useMemo(() => {
-    let tempPuzzle = puzzle;
-    return gameResult.lastPlay.map((word, i) => {
-      const indexes = inputMatchedIndexes(tempPuzzle, word);
-
-      let rating: Rating = null;
-      let optimalMoves = null;
-      if (i === gameResult.lastPlay.length - 1) {
-        if (indexes.length >= 6) {
-          rating = "brilliant"
-        } else if (indexes.length >= 5) {
-          rating = "strong"
-        }
-      } else if (superWords) {
-        const result = sampleOptimalMoves(tempPuzzle, superWords, 5);
-        rating = rateMove(indexes.length, result.matched);
-        if (indexes.length !== result.matched) {
-          optimalMoves = result.sample;
-        }
-      }
-      const puzzleState = tempPuzzle;
-      tempPuzzle = tempPuzzle.slice(indexes.length);
-
-      return { word, indexes, rating, optimalMoves, puzzleState };
-    });
-  }, [puzzle, gameResult.lastPlay, superWords]);
-
   return (
     <>
       <ScoreDisplay result={gameResult} />
@@ -53,15 +25,18 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
         <button
           class="btn btn-ghost justify-center"
           onClick={() => {
-            const turns = moves.map(({ word, indexes }) =>
-              word
+            let tempPuzzle = puzzle;
+            const turns = gameResult.lastPlay.map((word) => {
+              const indexes = inputMatchedIndexes(tempPuzzle, word);
+              tempPuzzle = tempPuzzle.slice(indexes.length);
+              return word
                 .split("")
                 .map((_, i) => (indexes.includes(i) ? "🟩" : "⬜"))
-                .join(""),
-            );
+                .join("");
+            });
             const shareText = [
               "wordmongering.com",
-              `#${day} - ${moves.length}/10`,
+              `#${day} - ${gameResult.lastPlay.length}/10`,
               ...turns,
             ].join("\n");
             window.navigator.clipboard.writeText(shareText);
@@ -85,66 +60,100 @@ export function Results({ day, puzzle, gameResult, streaks, onPlayAgain }: Props
         lastScore={gameResult.lastPlay.length}
         plays={gameResult.plays}
       />
-      <div class="rounded-xl bg-background mb-8">
-        <div class="text-lg font-semibold py-2">Your moves</div>
-        <ul class="flex flex-col gap-2 list-decimal pt-0 pl-4">
-          {moves.map(({ word, indexes, rating, optimalMoves, puzzleState }, i) => (
-            <li key={i} class="group">
-              <div class="flex justify-between flex-wrap gap-2">
-                <div class="font-bold">
-                  <WordTiles
-                    word={word}
-                    indexes={indexes}
-                    letterClass="w-6"
-                    matchedClass="bg-lime-300"
-                  />
-                </div>
-                <MoveAnnotation rating={rating} />
-              </div>
-              {superWords && (optimalMoves ? (
-                <details>
-                  <summary
-                    class={cl([
-                      "py-1 cursor-pointer [&::-webkit-details-marker]:hidden focus-visible:opacity-100 @hover:opacity-100 transition-opacity select-none",
-                      rating === "blunder" || rating === "weak"
-                        ? "text-red-800 font-semibold opacity-80 "
-                        : "text-stone-500 opacity-50",
-                    ])}
-                  >
-                    Reveal best move
-                  </summary>
-                  <div class="text-sm p-2 bg-orange-100">
-                    <div>Puzzle</div>
-                    <div class="font-bold">
-                      <PuzzleTiles
-                        word={puzzleState}
-                        userClass="bg-lime-300"
-                        optimalClass="bg-teal-300"
-                        userMatched={indexes.length}
-                        optimalMatched={optimalMoves[0].indexes.length}
-                      />
-                    </div>
-                    <div>Moves</div>
-                    <ul class="font-bold flex flex-col gap-2">
-                      {optimalMoves.map(({ word, indexes }, j) => (
-                        <li key={j}>
-                          <WordTiles
-                            word={word}
-                            indexes={indexes}
-                            letterClass="w-4"
-                            matchedClass="bg-teal-300"
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </details>
-              ) : <div class="pl-2 py-1 text-stone-500 opacity-50 select-none">You played the best move!</div>)}
-            </li>
-          ))}
-        </ul>
-      </div>
+      <MoveAnalysis puzzle={puzzle} words={gameResult.lastPlay} />
     </>
+  );
+}
+
+export function MoveAnalysis({ puzzle, words }: { puzzle: string; words: string[] }) {
+  const { superWords } = useWords();
+  const moves = useMemo(() => {
+    let tempPuzzle = puzzle;
+    return words.map((word, i) => {
+      const indexes = inputMatchedIndexes(tempPuzzle, word);
+
+      let rating: Rating = null;
+      let optimalMoves = null;
+      if (indexes.length === tempPuzzle.length) {
+        if (indexes.length >= 6) {
+          rating = "brilliant";
+        } else if (indexes.length >= 5) {
+          rating = "strong";
+        }
+      } else if (superWords) {
+        const result = sampleOptimalMoves(tempPuzzle, superWords, 5);
+        rating = rateMove(indexes.length, result.matched);
+        if (indexes.length !== result.matched) {
+          optimalMoves = result.sample;
+        }
+      }
+      const puzzleState = tempPuzzle;
+      tempPuzzle = tempPuzzle.slice(indexes.length);
+
+      return { word, indexes, rating, optimalMoves, puzzleState };
+    });
+  }, [puzzle, words, superWords]);
+
+  return (
+    <div class="rounded-xl bg-background">
+      <div class="text-lg font-semibold py-2">Your moves</div>
+      <ul class="flex flex-col gap-2 list-decimal pt-0 pl-4">
+        {moves.map(({ word, indexes, rating, optimalMoves, puzzleState }, i) => (
+          <li key={i} class="group">
+            <div class="flex justify-between flex-wrap gap-2">
+              <div class="font-bold">
+                <WordTiles
+                  word={word}
+                  indexes={indexes}
+                  letterClass="w-6"
+                  matchedClass="bg-lime-300"
+                />
+              </div>
+              <MoveAnnotation rating={rating} />
+            </div>
+            {superWords && (optimalMoves ? (
+              <details>
+                <summary
+                  class={cl([
+                    "py-1 cursor-pointer [&::-webkit-details-marker]:hidden focus-visible:opacity-100 @hover:opacity-100 transition-opacity select-none",
+                    rating === "blunder" || rating === "weak"
+                      ? "text-red-800 font-semibold opacity-80 "
+                      : "text-stone-500 opacity-50",
+                  ])}
+                >
+                  Reveal best move
+                </summary>
+                <div class="text-sm p-2 bg-orange-100">
+                  <div>Puzzle</div>
+                  <div class="font-bold">
+                    <PuzzleTiles
+                      word={puzzleState}
+                      userClass="bg-lime-300"
+                      optimalClass="bg-teal-300"
+                      userMatched={indexes.length}
+                      optimalMatched={optimalMoves[0].indexes.length}
+                    />
+                  </div>
+                  <div>Moves</div>
+                  <ul class="font-bold flex flex-col gap-2">
+                    {optimalMoves.map(({ word, indexes }, j) => (
+                      <li key={j}>
+                        <WordTiles
+                          word={word}
+                          indexes={indexes}
+                          letterClass="w-4"
+                          matchedClass="bg-teal-300"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </details>
+            ) : <div class="pl-2 py-1 text-stone-500 opacity-50 select-none">You played the best move!</div>)}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

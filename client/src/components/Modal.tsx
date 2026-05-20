@@ -19,9 +19,8 @@ export function Modal({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      class="bg-background rounded-xl p-4 w-full max-w-md shadow-[0_0_16px_rgb(25,0,0/0.1)]"
+      class="bg-background rounded-xl p-4 max-w-md shadow-[0_0_16px_rgb(25,0,0/0.1)]"
     >
-      {/* <div class="bg-background rounded-xl p-4"> */}
       <div class="flex justify-between items-center mb-4 gap-4">
         <h2 class="font-bold text-xl">{title}</h2>
         <button
@@ -32,7 +31,6 @@ export function Modal({
         </button>
       </div>
       <div class="flex flex-col gap-4">{children}</div>
-      {/* </div> */}
     </dialog>
   );
 }

@@ -38,12 +38,14 @@ export function Game({
   words,
   puzzle,
   onComplete,
+  onTurn,
   extraTilesOnTurn,
 }: {
   words: Set<string>;
   puzzle: string;
   onComplete?: (words: string[]) => void;
-  extraTilesOnTurn?: (turn: number) => string[];
+  onTurn?: (words: string[]) => void;
+  extraTilesOnTurn?: (nextEnemyLength: number) => string[];
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -63,7 +65,7 @@ export function Game({
     return { type: "adding", offset, initialOffset: offset, addedAt: 0 };
   });
 
-  const [input, setInput] = useState("");
+  const [rawInput, setRawInput] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [reportWord, setReportWord] = useState<string | null>(null);
@@ -92,7 +94,8 @@ export function Game({
   const slideOffset = phase.type === "adding" || phase.type === "sliding" ? phase.offset : null;
   const poppingCount = phase.type === "popping" ? phase.count : null;
   const isAnimating = phase.type !== "idle" || celebrating;
-  const { matched, candidates } = puzzleMatchedTiles(tiles, input);
+  const cleanInput = rawInput.toUpperCase();
+  const { matched, candidates } = puzzleMatchedTiles(tiles, cleanInput);
 
   let minX = 0,
     maxX = 0,
@@ -137,26 +140,27 @@ export function Game({
       return;
     }
 
-    if (usedWordsRef.current.includes(input)) {
+    if (usedWordsRef.current.includes(cleanInput)) {
       triggerError("Cannot repeat words");
       return;
     }
-    if (!words.has(input)) {
+    if (!words.has(cleanInput)) {
       triggerError("Not in word list");
       return;
     }
 
     const nextEnemy = tiles.slice(greenCount);
     turnRef.current += 1;
-    const extraLetters = extraTilesOnTurn ? extraTilesOnTurn(turnRef.current) : [];
+    const extraLetters = extraTilesOnTurn ? extraTilesOnTurn(nextEnemy.length) : [];
     const extraTiles: PuzzleTile[] = extraLetters.map((letter) => ({
       id: nextIdRef.current++,
       letter,
     }));
 
-    usedWordsRef.current.push(input);
+    usedWordsRef.current.push(cleanInput);
+    if (onTurn) onTurn([...usedWordsRef.current]);
 
-    if (input === "WORDMONGERING") {
+    if (cleanInput === "WORDMONGERING") {
       setCelebrating(true);
       playHorn();
       await sleep(3200);
@@ -164,7 +168,7 @@ export function Game({
     }
 
     setErrorMsg(null);
-    setInput("");
+    setRawInput("");
     setPhase({ type: "popping", count: greenCount });
 
     for (let i = 0; i < greenCount; i++) {
@@ -218,7 +222,7 @@ export function Game({
   const cursorVisible = phase.type === "idle" && matched.length < tiles.length;
 
   return (
-    <>
+    <div class="flex-1 flex flex-col -my-8">
       <div
         class="isolate relative mt-auto mx-auto"
         style={{ width: containerW, height: containerH }}
@@ -238,29 +242,29 @@ export function Game({
               onTransitionEnd={
                 isFirstMoving
                   ? (e) => {
-                      if (e.propertyName !== "transform") return;
-                      if (phase.type === "sliding" && phase.offset === 0) {
-                        const pending = pendingAddRef.current;
-                        if (pending !== null) {
-                          pendingAddRef.current = null;
-                          setTiles((prev) => [...prev, ...pending.tiles]);
-                          setPhase({
-                            type: "adding",
-                            offset: pending.tiles.length + 1,
-                            initialOffset: pending.tiles.length + 1,
-                            addedAt: pending.addedAt,
-                          });
-                        } else {
-                          setPhase({ type: "idle" });
-                        }
-                      } else {
-                        setPhase((prev) => {
-                          if (prev.type !== "adding" && prev.type !== "sliding") return prev;
-                          if (prev.offset === 0) return { type: "idle" };
-                          return { ...prev, offset: prev.offset - 1 };
+                    if (e.propertyName !== "transform") return;
+                    if (phase.type === "sliding" && phase.offset === 0) {
+                      const pending = pendingAddRef.current;
+                      if (pending !== null) {
+                        pendingAddRef.current = null;
+                        setTiles((prev) => [...prev, ...pending.tiles]);
+                        setPhase({
+                          type: "adding",
+                          offset: pending.tiles.length + 1,
+                          initialOffset: pending.tiles.length + 1,
+                          addedAt: pending.addedAt,
                         });
+                      } else {
+                        setPhase({ type: "idle" });
                       }
+                    } else {
+                      setPhase((prev) => {
+                        if (prev.type !== "adding" && prev.type !== "sliding") return prev;
+                        if (prev.offset === 0) return { type: "idle" };
+                        return { ...prev, offset: prev.offset - 1 };
+                      });
                     }
+                  }
                   : undefined
               }
               style={{
@@ -318,72 +322,68 @@ export function Game({
         )}
       </div>
       <div class="opacity-0" style={{ animation: "fade-in 0.8s ease-out 1.5s forwards" }}>
-        <div class="text-sm text-center">
+        <div class="text-sm text-center pt-4 pb-2">
           <div class="bg-background">
             Type a word containing this letter.
             <div class="text-stone-500 whitespace-pre">Match more letters to clear faster.</div>
           </div>
         </div>
-
-        <div class="py-2">
-          <div class="relative">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onInput={(e) => {
-                initAudio();
-                const newInput = (e.target as HTMLInputElement).value.trim();
-                prevMatchedCountRef.current = matched.length;
-                setInput(newInput.toUpperCase());
-                setErrorMsg(null);
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              class={cl([
-                "w-full h-14 pl-3 pr-20 sm:(text-xl h-16 pl-4 pr-22) rounded-xl font-bold uppercase tracking-widest transition-colors bg-orange-100 outline-none",
-                errorMsg && "ring-4 ring-red-500/60",
-              ])}
-              placeholder="type a word..."
-              autocomplete="off"
-              autocorrect="off"
-              autocapitalize="off"
-              spellcheck={false}
-            />
-            <button
-              class="absolute top-2 right-2 sm:(top-3 right-3) btn-orange rounded-md text-2xl h-10 px-3 font-bold"
-              onClick={handleSubmit}
+        <div class="relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={rawInput}
+            onInput={(e) => {
+              initAudio();
+              prevMatchedCountRef.current = matched.length;
+              setRawInput((e.target as HTMLInputElement).value.trim());
+              setErrorMsg(null);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            class={cl([
+              "w-full h-14 pl-3 pr-20 sm:(text-xl h-16 pl-4 pr-22) rounded-xl font-bold uppercase tracking-widest transition-colors bg-orange-100 outline-none",
+              errorMsg && "ring-4 ring-red-500/60",
+            ])}
+            placeholder="type a word..."
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck={false}
+          />
+          <button
+            class="absolute top-2 right-2 sm:(top-3 right-3) btn-orange rounded-md text-2xl h-10 px-3 font-bold"
+            onClick={handleSubmit}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="w-6 h-6"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="w-6 h-6"
-              >
-                <path d="M20 4v7a4 4 0 0 1-4 4H4" />
-                <path d="m9 10-5 5 5 5" />
-              </svg>
+              <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+              <path d="m9 10-5 5 5 5" />
+            </svg>
+          </button>
+        </div>
+        <div class="flex h-9 px-3 sm:px-4 py-2 gap-2 text-sm text-red-600" role="alert">
+          <span>{errorMsg}</span>
+          {errorMsg === "Not in word list" && (
+            <button
+              class="underline text-red-400 @hover:text-red-600"
+              onClick={() => setReportWord(cleanInput)}
+            >
+              Report missing word
             </button>
-          </div>
-          <div class="flex h-9 px-3 sm:px-4 py-2 gap-2 text-sm text-red-600" role="alert">
-            <span>{errorMsg}</span>
-            {errorMsg === "Not in word list" && (
-              <button
-                class="underline text-red-400 @hover:text-red-600"
-                onClick={() => setReportWord(input)}
-              >
-                Report missing word
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
       {reportWord !== null && <ReportModal word={reportWord} onClose={() => setReportWord(null)} />}
       {celebrating && <WordmongeringCelebration />}
-    </>
+    </div>
   );
 }
 

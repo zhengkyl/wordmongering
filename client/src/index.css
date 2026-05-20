@@ -6,14 +6,6 @@
   animation-duration: 3s;
 } */
 
-html {
-  /* Necessary but unfixably breaks dialog backdrop */
-  scrollbar-gutter: stable;
-}
-dialog::backdrop {
-  background: none;
-}
-
 ::view-transition-old(wordmongering-logo),
 ::view-transition-new(wordmongering-logo) {
   height: 100%;

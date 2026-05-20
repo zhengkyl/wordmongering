@@ -1,13 +1,12 @@
 import { getDayNumber } from "./daily";
 
-type AllResults = Record<string, GameResult>;
-
-type PlayRecord = Record<number, [number, number]>;
-
 const RESULTS_KEY = "wm_results";
 const RESULTS_VERSION = 2;
 const STREAKS_KEY = "wm_streaks";
 const STREAKS_VERSION = 2;
+
+type StreakRecord = Record<number, [number, number]>;
+type ResultsRecord = Record<number, GameResult>;
 
 export type GameResult = {
   firstScore: number;
@@ -16,51 +15,49 @@ export type GameResult = {
   plays: number;
 };
 
-function getAllResults(): AllResults {
-  const raw = localStorage.getItem(RESULTS_KEY);
+function loadVersionedData(key: string, version: number, migrate: (old: any) => any) {
+  const raw = localStorage.getItem(key);
   if (!raw) return {};
+
   const parsed = JSON.parse(raw);
-  if (!("_v" in parsed) || parsed._v !== RESULTS_VERSION) {
-    return {};
+  if (!("_v" in parsed)) return { };
+
+  if (parsed._v !== version) {
+    return migrate(parsed);
   }
-  return (parsed as { _v: number; data: AllResults }).data;
+  return parsed.data
 }
 
-function saveAllResults(data: AllResults) {
-  localStorage.setItem(RESULTS_KEY, JSON.stringify({ _v: RESULTS_VERSION, data }));
+export function getResultsRecord(){
+  return loadVersionedData(RESULTS_KEY, RESULTS_VERSION, () => ({})) as ResultsRecord
+}
+function getStreaksRecord(){
+  return loadVersionedData(STREAKS_KEY, STREAKS_VERSION, () =>({})) as StreakRecord
 }
 
 export function getDayResults(day: number): GameResult | null {
-  return getAllResults()[day] ?? null;
+  return getResultsRecord()[day] ?? null;
 }
 
 export function updateDayResults(day: number, words: string[]): GameResult {
-  const all = getAllResults();
+  const all = getResultsRecord();
   const existing = all[day] ?? null;
-  const plays = (existing?.plays ?? 0) + 1;
-  const gameResult: GameResult = {
-    firstScore: existing ? existing.firstScore : words.length,
-    bestScore: existing && existing.bestScore <= words.length ? existing.bestScore : words.length,
+  
+  const gameResult = existing ? {
+    firstScore: existing.firstScore,
+    bestScore: existing.bestScore <= words.length ? existing.bestScore : words.length,
     lastPlay: words,
-    plays,
-  };
-  all[day] = gameResult;
-  saveAllResults(all);
-  return gameResult;
-}
-
-function getPlayRecord(): PlayRecord {
-  const raw = localStorage.getItem(STREAKS_KEY);
-  if (!raw) return {};
-  const parsed = JSON.parse(raw);
-  if (!("_v" in parsed) || parsed._v !== STREAKS_VERSION) {
-    return {};
+    plays: existing.plays + 1
+  } : {
+    firstScore: words.length,
+    bestScore: words.length,
+    lastPlay: words,
+    plays: 1
   }
-  return (parsed as { _v: number; data: PlayRecord }).data;
-}
+  all[day] = gameResult;
 
-function savePlayRecord(data: PlayRecord) {
-  localStorage.setItem(STREAKS_KEY, JSON.stringify({ _v: STREAKS_VERSION, data }));
+  localStorage.setItem(RESULTS_KEY, JSON.stringify({ _v: RESULTS_VERSION, data:all }));
+  return gameResult;
 }
 
 export function updateStreak(
@@ -78,24 +75,26 @@ export function updateStreak(
     return null;
   }
 
-  const record = getPlayRecord();
+  const record = getStreaksRecord();
   if (day in record) return null;
   record[day] = time;
-  savePlayRecord(record);
+
+  localStorage.setItem(STREAKS_KEY, JSON.stringify({ _v: STREAKS_VERSION, data: record }));
+
   return getStats(record);
 }
 
 export function getCompletedDaySet(): Set<number> {
-  return new Set(Object.keys(getAllResults()).map(Number));
+  return new Set(Object.keys(getResultsRecord()).map(Number));
 }
 
-export function getStats(record?: PlayRecord): {
+export function getStats(record?: StreakRecord): {
   daysPlayed: number;
   currentStreak: number;
   bestStreak: number;
 } {
   if (!record) {
-    record = getPlayRecord();
+    record = getStreaksRecord();
   }
 
   const days = Object.keys(record)
