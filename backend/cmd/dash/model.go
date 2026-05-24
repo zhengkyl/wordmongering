@@ -42,12 +42,13 @@ type page interface {
 }
 
 type model struct {
-	props   common.Props
-	tab     tab
-	quit    quitDialog
-	puzzles *puzzles.Model
-	reports *reports.Model
-	results *results.Model
+	props    common.Props
+	tab      tab
+	quit     quitDialog
+	quitting bool
+	puzzles  *puzzles.Model
+	reports  *reports.Model
+	results  *results.Model
 }
 
 func (m model) activePage() page {
@@ -98,12 +99,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.quit.activeBtn = 1
 			case "enter", "space":
 				if m.quit.activeBtn == 0 {
+					m.quitting = true
 					return m, tea.Quit
 				}
 				m.quit.show = false
 			case "esc", "n":
 				m.quit.show = false
 			case "y":
+				m.quitting = true
 				return m, tea.Quit
 			}
 			return m, nil
@@ -151,11 +154,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() tea.View {
+	if m.quitting {
+		v := tea.NewView("")
+		v.AltScreen = true
+		return v
+	}
+
 	p := m.activePage()
 	bg := common.RenderHeader(m.props.Width, int(m.tab), p.TitleRight()) + "\n" + p.View()
 
 	if !m.quit.show {
 		v := tea.NewView(bg)
+		v.AltScreen = true
 		v.MouseMode = tea.MouseModeCellMotion
 		return v
 	}
@@ -179,5 +189,6 @@ func (m model) View() tea.View {
 	)
 	v := tea.NewView(comp.Render())
 	v.MouseMode = tea.MouseModeCellMotion
+	v.AltScreen = true
 	return v
 }
