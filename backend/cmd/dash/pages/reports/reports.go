@@ -81,7 +81,16 @@ func (m *Model) TitleRight() string {
 	return n + " reports"
 }
 
-func (m *Model) Update(msg tea.Msg) tea.Cmd {
+func (m *Model) moveDown() (tea.Cmd, bool) {
+	m.pager.MoveDown(len(m.items))
+	if !m.loaded && !m.loading && m.pager.Cursor >= len(m.items)-5 {
+		m.loading = true
+		return loadMoreReports(m.props.Global.DB, len(m.items)), true
+	}
+	return nil, true
+}
+
+func (m *Model) Update(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case moreReportsMsg:
 		m.loading = false
@@ -97,28 +106,31 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 		km := m.props.Global.KeyMap
 		switch {
 		case key.Matches(msg, km.Down):
-			m.pager.MoveDown(len(m.items))
+			return m.moveDown()
 		case key.Matches(msg, km.Up):
 			m.pager.MoveUp()
+			return nil, true
 		}
-		if !m.loaded && !m.loading && m.pager.Cursor >= len(m.items)-5 {
-			m.loading = true
-			return loadMoreReports(m.props.Global.DB, len(m.items))
+	case tea.MouseWheelMsg:
+		switch msg.Button {
+		case tea.MouseWheelDown:
+			return m.moveDown()
+		case tea.MouseWheelUp:
+			m.pager.MoveUp()
+			return nil, true
 		}
 	}
-	return nil
+	return nil, false
 }
 
 const (
 	itemH      = 3
-	scrollbarW = 3
+	scrollbarW = 2
 )
 
 func (m *Model) View() string {
 	width := m.props.Width
 	contentH := m.props.Height - 2
-	contentW := width - scrollbarW
-
 	hints := common.RenderKey("j/k", "navigate") + "  " + common.RenderKey("1/2/3", "tab")
 	footer := common.RenderFooter(width, hints, m.pager.PageInfo(len(m.items), m.loaded))
 
@@ -137,6 +149,11 @@ func (m *Model) View() string {
 
 	pageStart := m.pager.PageStart()
 	pageEnd := min(pageStart+util.ItemsPerPage, len(m.items))
+	showScrollbar := pageEnd-pageStart > visItems
+	contentW := width
+	if showScrollbar {
+		contentW = width - scrollbarW
+	}
 	m.pager.UpdateViewport(visItems)
 
 	viewStart := pageStart + m.pager.ViewportOff
@@ -175,7 +192,9 @@ func (m *Model) View() string {
 
 	content := strings.TrimSuffix(b.String(), "\n")
 	contentStyled := lipgloss.NewStyle().Width(contentW).Height(contentH).Render(content)
-	scrollBar := util.RenderScrollbar(contentH, util.ItemsPerPage, m.pager.PosInPage())
-	body := lipgloss.JoinHorizontal(lipgloss.Top, contentStyled, scrollBar)
-	return body + "\n" + footer
+	if showScrollbar {
+		scrollBar := util.RenderScrollbar(contentH, pageEnd-pageStart, m.pager.PosInPage())
+		return lipgloss.JoinHorizontal(lipgloss.Top, contentStyled, scrollBar) + "\n" + footer
+	}
+	return contentStyled + "\n" + footer
 }

@@ -1,20 +1,17 @@
 package util
 
-import (
-	"strings"
-
-	"charm.land/lipgloss/v2"
-)
+import "strings"
 
 const (
-	scrollTop  = "▀"
-	scrollBot  = "▄"
-	scrollFull = "█"
+	scrollTop   = "▀"
+	scrollBot   = "▄"
+	scrollFull  = "█"
+	scrollEmpty = " "
+	scrollUp    = "▲"
+	scrollDown  = "▼"
 )
 
-var scrollStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), true)
-
-// RenderScrollbar renders a 3-column scrollbar of the given total height (including border).
+// RenderScrollbar renders a 1-column scrollbar of the given total height.
 // positions is the number of distinct scroll positions; pos is the current one.
 func RenderScrollbar(height, positions, pos int) string {
 	innerHeight := height - 2
@@ -35,7 +32,9 @@ func RenderScrollbar(height, positions, pos int) string {
 	thumbEndIndex := endPos / 2
 
 	var sb strings.Builder
+	sb.WriteString(" " + scrollUp + "\n")
 	for i := 0; i < innerHeight; i++ {
+		sb.WriteString(" ")
 		if i == thumbStartIndex {
 			if pos%2 == 1 {
 				sb.WriteString(scrollBot)
@@ -53,11 +52,12 @@ func RenderScrollbar(height, positions, pos int) string {
 		} else if i > thumbStartIndex && i < thumbEndIndex {
 			sb.WriteString(scrollFull)
 		} else {
-			sb.WriteString(" ")
+			sb.WriteString(scrollEmpty)
 		}
 		if i != innerHeight-1 {
 			sb.WriteString("\n")
 		}
 	}
-	return scrollStyle.Render(sb.String())
+	sb.WriteString("\n " + scrollDown)
+	return sb.String()
 }

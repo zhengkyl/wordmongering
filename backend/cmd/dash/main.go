@@ -25,7 +25,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := puzzles.InitWords(filepath.Join(staticDir, "super25k.txt")); err != nil {
+	words, err := puzzles.InitWords(filepath.Join(staticDir, "super25k.txt"))
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "load words: %v\n", err)
 		os.Exit(1)
 	}
@@ -42,6 +43,7 @@ func main() {
 			DB:         db,
 			KeyMap:     keymap.Default(),
 			PuzzlePath: filepath.Join(staticDir, "puzzles.txt"),
+			Words:      words,
 		},
 	}
 

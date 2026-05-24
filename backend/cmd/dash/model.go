@@ -31,6 +31,16 @@ type quitDialog struct {
 	activeBtn int // 0=Yes, 1=No
 }
 
+// page is the interface all tab pages must implement.
+// handled=true means the child consumed the message; the parent skips its own handling.
+// For data messages (non-input), children always return handled=false.
+type page interface {
+	SetProps(common.Props)
+	TitleRight() string
+	Update(tea.Msg) (tea.Cmd, bool)
+	View() string
+}
+
 type model struct {
 	props   common.Props
 	tab     tab
@@ -38,6 +48,17 @@ type model struct {
 	puzzles *puzzles.Model
 	reports *reports.Model
 	results *results.Model
+}
+
+func (m model) activePage() page {
+	switch m.tab {
+	case tabPuzzles:
+		return m.puzzles
+	case tabResults:
+		return m.results
+	default:
+		return m.reports
+	}
 }
 
 func newModel(props common.Props) model {
@@ -88,80 +109,55 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		km := m.props.Global.KeyMap
-		isEditing := m.tab == tabPuzzles && m.puzzles.IsEditing()
-		// esc backs out of the focus stack; at root level it opens the quit dialog
-		if msg.String() == "esc" {
-			atRoot := m.tab != tabPuzzles || m.puzzles.IsAtRoot()
-			if atRoot {
-				m.quit = quitDialog{show: true, activeBtn: 1}
-				return m, nil
-			}
-			// fall through: let puzzle handle esc to back out of pvEdit/pvSaved
+		// Active child handles first.
+		cmd, handled := m.activePage().Update(msg)
+		if handled {
+			return m, cmd
 		}
-		// q passes through to puzzle editor when editing; ctrl+c always shows dialog
-		if key.Matches(msg, km.Quit) && (!isEditing || msg.String() != "q") {
-			m.quit = quitDialog{show: true, activeBtn: 1}
+
+		// Child didn't handle it — parent handles global keys.
+		km := m.props.Global.KeyMap
+		if msg.String() == "esc" || key.Matches(msg, km.Quit) {
+			m.quit = quitDialog{show: true, activeBtn: 0}
 			return m, nil
 		}
-
-		if !isEditing {
-			switch {
-			case key.Matches(msg, km.Tab1):
-				m.tab = tabPuzzles
-				return m, nil
-			case key.Matches(msg, km.Tab2):
-				m.tab = tabResults
-				if m.results.NeedsLoad() {
-					return m, m.results.Load(0)
-				}
-				return m, nil
-			case key.Matches(msg, km.Tab3):
-				m.tab = tabReports
-				if m.reports.NeedsLoad() {
-					return m, m.reports.Load()
-				}
-				return m, nil
+		switch {
+		case key.Matches(msg, km.Tab1):
+			m.tab = tabPuzzles
+		case key.Matches(msg, km.Tab2):
+			m.tab = tabResults
+			if m.results.NeedsLoad() {
+				return m, m.results.Load(0)
+			}
+		case key.Matches(msg, km.Tab3):
+			m.tab = tabReports
+			if m.reports.NeedsLoad() {
+				return m, m.reports.Load()
 			}
 		}
+		return m, nil
 
-		var cmd tea.Cmd
-		switch m.tab {
-		case tabPuzzles:
-			cmd = m.puzzles.Update(msg)
-		case tabReports:
-			cmd = m.reports.Update(msg)
-		case tabResults:
-			cmd = m.results.Update(msg)
-		}
+	case tea.MouseWheelMsg:
+		cmd, _ := m.activePage().Update(msg)
 		return m, cmd
 
 	default:
-		return m, tea.Batch(
-			m.puzzles.Update(msg),
-			m.reports.Update(msg),
-			m.results.Update(msg),
-		)
+		// Non-key messages go to all children.
+		pc, _ := m.puzzles.Update(msg)
+		rc, _ := m.results.Update(msg)
+		rpc, _ := m.reports.Update(msg)
+		return m, tea.Batch(pc, rc, rpc)
 	}
 }
 
 func (m model) View() tea.View {
-	var right, content string
-	switch m.tab {
-	case tabPuzzles:
-		right = m.puzzles.TitleRight()
-		content = m.puzzles.View()
-	case tabReports:
-		right = m.reports.TitleRight()
-		content = m.reports.View()
-	case tabResults:
-		right = m.results.TitleRight()
-		content = m.results.View()
-	}
-	bg := common.RenderHeader(m.props.Width, int(m.tab), right) + "\n" + content
+	p := m.activePage()
+	bg := common.RenderHeader(m.props.Width, int(m.tab), p.TitleRight()) + "\n" + p.View()
 
 	if !m.quit.show {
-		return tea.NewView(bg)
+		v := tea.NewView(bg)
+		v.MouseMode = tea.MouseModeCellMotion
+		return v
 	}
 
 	if extra := m.props.Height - (strings.Count(bg, "\n") + 1); extra > 0 {
@@ -181,5 +177,7 @@ func (m model) View() tea.View {
 		lipgloss.NewLayer(bg),
 		lipgloss.NewLayer(dialog).X(x).Y(y),
 	)
-	return tea.NewView(comp.Render())
+	v := tea.NewView(comp.Render())
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
 }
