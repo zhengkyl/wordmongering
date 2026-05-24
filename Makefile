@@ -21,7 +21,7 @@ build:
 	cd backend && go build -o ../bin/dash ./cmd/dash
 
 addword:
-	echo "$(w)" | sort -mu - $(STATIC_DIR)/words.txt -o $(STATIC_DIR)/words.txt
+	echo "$(w)" | tr '[:lower:]' '[:upper:]' | sort -mu - $(STATIC_DIR)/words.txt -o $(STATIC_DIR)/words.txt
 
 addwords:
-	sort "$(f)" | sort -mu - $(STATIC_DIR)/words.txt -o $(STATIC_DIR)/words.txt
+	sort "$(f)" | tr '[:lower:]' '[:upper:]' | sort -mu - $(STATIC_DIR)/words.txt -o $(STATIC_DIR)/words.txt
