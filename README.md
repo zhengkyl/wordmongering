@@ -1,8 +1,9 @@
 # Wordmongering
 
 Try it out at [wordmongering.com](https://wordmongering.com)
-
-![game preview](./docs/preview.png)
+| Solve daily puzzles      | Analyze your moves               |
+| ------------------------ | -------------------------------- |
+| ![game](./docs/game.png) | ![postgame](./docs/postgame.png) |
 
 ## TODO
 
