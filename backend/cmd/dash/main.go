@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	_ "github.com/mattn/go-sqlite3"
@@ -12,6 +13,33 @@ import (
 	"github.com/zhengkyl/wordmongering/backend/cmd/dash/keymap"
 	"github.com/zhengkyl/wordmongering/backend/cmd/dash/pages/puzzles"
 )
+
+func loadWordList(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	words := make([]string, 0, len(lines))
+	for _, l := range lines {
+		if l != "" {
+			words = append(words, l)
+		}
+	}
+	return words, nil
+}
+
+func loadWordSet(path string) (map[string]struct{}, error) {
+	words, err := loadWordList(path)
+	if err != nil {
+		return nil, err
+	}
+	set := make(map[string]struct{}, len(words))
+	for _, w := range words {
+		set[w] = struct{}{}
+	}
+	return set, nil
+}
 
 func main() {
 	staticDir := os.Getenv("STATIC_DIR")
@@ -25,7 +53,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	words, err := puzzles.InitWords(filepath.Join(staticDir, "super25k.txt"))
+	superWords, err := loadWordList(filepath.Join(staticDir, "super25k.txt"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load super25k: %v\n", err)
+		os.Exit(1)
+	}
+	puzzles.InitWords(superWords)
+
+	wordSet, err := loadWordSet(filepath.Join(staticDir, "words.txt"))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load words: %v\n", err)
 		os.Exit(1)
@@ -40,10 +75,10 @@ func main() {
 
 	props := common.Props{
 		Global: common.Global{
-			DB:         db,
-			KeyMap:     keymap.Default(),
-			PuzzlePath: filepath.Join(staticDir, "puzzles.txt"),
-			Words:      words,
+			DB:      db,
+			KeyMap:  keymap.Default(),
+			Words:   superWords,
+			WordSet: wordSet,
 		},
 	}
 

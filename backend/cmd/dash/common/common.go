@@ -2,6 +2,8 @@ package common
 
 import (
 	"database/sql"
+	"math"
+	"os"
 	"strconv"
 	"time"
 
@@ -13,10 +15,26 @@ const (
 	PageSize = 10
 )
 
-var Epoch = time.Date(2026, time.April, 26, 0, 0, 0, 0, time.UTC)
+var Epoch = parseEpoch()
+
+func parseEpoch() time.Time {
+	s := os.Getenv("WM_EPOCH")
+	if s == "" {
+		panic("WM_EPOCH not set")
+	}
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		panic("invalid WM_EPOCH: " + err.Error())
+	}
+	return t.AddDate(0, 0, -1)
+}
 
 func DayToDate(day int) time.Time {
 	return Epoch.AddDate(0, 0, day)
+}
+
+func MaxDay() int {
+	return int(math.Ceil(time.Since(Epoch.AddDate(0, 0, 1).Add(-14 * time.Hour)).Hours() / 24.0))
 }
 
 func DayLabel(day int) string {
@@ -25,11 +43,12 @@ func DayLabel(day int) string {
 }
 
 type Global struct {
-	DB         *sql.DB
-	KeyMap     keymap.KeyMap
-	PuzzlePath string
-	Words      []string
+	DB      *sql.DB
+	KeyMap  keymap.KeyMap
+	Words   []string
+	WordSet map[string]struct{}
 }
+
 
 type Props struct {
 	Width  int

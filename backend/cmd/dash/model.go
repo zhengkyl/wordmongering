@@ -145,7 +145,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	default:
-		// Non-key messages go to all children.
 		pc, _ := m.puzzles.Update(msg)
 		rc, _ := m.results.Update(msg)
 		rpc, _ := m.reports.Update(msg)

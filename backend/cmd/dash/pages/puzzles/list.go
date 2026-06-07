@@ -1,8 +1,7 @@
 package puzzles
 
 import (
-	"fmt"
-	"os"
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -10,43 +9,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/zhengkyl/wordmongering/backend/cmd/dash/common"
 	"github.com/zhengkyl/wordmongering/backend/cmd/dash/util"
+	"github.com/zhengkyl/wordmongering/backend/internal/game"
 )
-
-type puzzleRow struct {
-	day    int
-	puzzle string
-}
-
-type morePuzzlesMsg []puzzleRow
-type savedMsg struct{}
-type puzzleErrMsg struct{ error }
-
-func loadAllPuzzles(path string) tea.Cmd {
-	return func() tea.Msg {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return morePuzzlesMsg(nil)
-			}
-			return puzzleErrMsg{err}
-		}
-		content := strings.TrimRight(string(data), "\n")
-		if content == "" {
-			return morePuzzlesMsg(nil)
-		}
-		lines := strings.Split(content, "\n")
-		puzzles := make([]puzzleRow, 0, len(lines))
-		for i, line := range lines {
-			if line != "" {
-				puzzles = append(puzzles, puzzleRow{day: i + 1, puzzle: line})
-			}
-		}
-		for i, j := 0, len(puzzles)-1; i < j; i, j = i+1, j-1 {
-			puzzles[i], puzzles[j] = puzzles[j], puzzles[i]
-		}
-		return morePuzzlesMsg(puzzles)
-	}
-}
 
 type puzzleItem struct {
 	day    int
@@ -60,12 +24,10 @@ const (
 	scrollbarW        = 2
 )
 
-// weekPager pages items by calendar week (7-day blocks starting from day 1).
-// Items must be sorted newest-first; week boundaries are detected by day number.
 type weekPager struct {
 	Cursor      int
 	ViewportOff int
-	starts      []int // index of first item in each week-page (newest first)
+	starts      []int
 }
 
 func (p *weekPager) Reset() {
@@ -148,18 +110,30 @@ func (p *weekPager) PageInfo(total int) string {
 		return ""
 	}
 	pg := p.pageOf(p.Cursor)
-	return fmt.Sprintf("page %d of %d", pg+1, len(p.starts))
+	return common.DimStyle.Render("page " + strconv.Itoa(pg+1) + " of " + strconv.Itoa(len(p.starts)))
 }
 
 func renderPuzzleItem(p puzzleItem, selected bool) string {
 	dateStr := common.DayLabel(p.day)
+	marks := annotate(p.puzzle)
+	var coloredPuzzle strings.Builder
+	for i, ch := range p.puzzle {
+		switch marks[i] {
+		case 'D':
+			coloredPuzzle.WriteString(common.ErrStyle.Render(string(ch)))
+		case '1':
+			coloredPuzzle.WriteString(common.WarnStyle.Render(string(ch)))
+		default:
+			coloredPuzzle.WriteString(string(ch))
+		}
+	}
 	var b strings.Builder
 	if selected {
 		b.WriteString(common.SelectedStyle.Render("┃") + " " + common.SelectedStyle.Render(dateStr) + "\n")
-		b.WriteString(common.SelectedStyle.Render("┃") + " " + common.DimStyle.Render(p.puzzle))
+		b.WriteString(common.SelectedStyle.Render("┃") + " " + coloredPuzzle.String())
 	} else {
 		b.WriteString("  " + common.TitleStyle.Render(dateStr) + "\n")
-		b.WriteString("  " + common.DimStyle.Render(p.puzzle))
+		b.WriteString("  " + coloredPuzzle.String())
 	}
 	return b.String()
 }
@@ -168,7 +142,6 @@ type listModel struct {
 	props common.Props
 	items []puzzleItem
 	pager weekPager
-	err   error
 }
 
 func newList(props common.Props) *listModel {
@@ -178,14 +151,22 @@ func newList(props common.Props) *listModel {
 func (m *listModel) SetProps(props common.Props) { m.props = props }
 
 func (m *listModel) Init() tea.Cmd {
-	return loadAllPuzzles(m.props.Global.PuzzlePath)
+	return m.loadPuzzles()
 }
 
-func (m *listModel) reloadData() tea.Cmd {
-	m.items = nil
-	m.pager.Reset()
-	return loadAllPuzzles(m.props.Global.PuzzlePath)
+func (m *listModel) loadPuzzles() tea.Cmd {
+	wordSet := m.props.Global.WordSet
+	return func() tea.Msg {
+		maxDay := common.MaxDay()
+		items := make([]puzzleItem, maxDay)
+		for d := maxDay; d >= 1; d-- {
+			items[maxDay-d] = puzzleItem{day: d, puzzle: game.GenerateDailyPuzzle(d, wordSet)}
+		}
+		return loadedMsg(items)
+	}
 }
+
+type loadedMsg []puzzleItem
 
 func (m *listModel) moveDown() (tea.Cmd, bool) {
 	m.pager.MoveDown(len(m.items))
@@ -194,23 +175,11 @@ func (m *listModel) moveDown() (tea.Cmd, bool) {
 
 func (m *listModel) Update(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
-	case morePuzzlesMsg:
-		for _, p := range msg {
-			m.items = append(m.items, puzzleItem{day: p.day, puzzle: p.puzzle})
-		}
+	case loadedMsg:
+		m.items = []puzzleItem(msg)
 		m.pager.Rebuild(m.items)
-		m.err = nil
-	case puzzleErrMsg:
-		m.err = msg.error
 	case tea.KeyPressMsg:
 		km := m.props.Global.KeyMap
-		if key.Matches(msg, km.Add) {
-			return func() tea.Msg { return openEditMsg{day: -1} }, true
-		}
-		if key.Matches(msg, km.Edit) && len(m.items) > 0 {
-			p := m.items[m.pager.Cursor]
-			return func() tea.Msg { return openEditMsg{day: p.day, puzzle: p.puzzle} }, true
-		}
 		switch {
 		case key.Matches(msg, km.Up):
 			m.pager.MoveUp()
@@ -234,13 +203,10 @@ func (m *listModel) View() string {
 	width := m.props.Width
 	contentH := m.props.Height - 2
 
-	hints := common.RenderKey("j/k", "navigate") + "  " + common.RenderKey("1/2/3", "tab") + " " + common.RenderKey("a", "add") + "  " + common.RenderKey("e/↵", "edit")
+	hints := common.RenderKey("j/k", "navigate") + "  " + common.RenderKey("1/2/3", "tab")
 	footer := common.RenderFooter(width, hints, m.pager.PageInfo(len(m.items)))
 
 	fullW := lipgloss.NewStyle().Width(width).Height(contentH)
-	if m.err != nil {
-		return fullW.Render("\n  "+common.ErrStyle.Render("error: "+m.err.Error())) + "\n" + footer
-	}
 	if len(m.items) == 0 {
 		return fullW.Render("") + "\n" + footer
 	}

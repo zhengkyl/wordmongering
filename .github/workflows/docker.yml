@@ -38,5 +38,7 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}:latest
+          build-args: |
+            VITE_WM_EPOCH=2026-04-27
           cache-from: type=gha
           cache-to: type=gha,mode=max
