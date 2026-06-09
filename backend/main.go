@@ -81,9 +81,9 @@ func run(ctx context.Context) error {
 	var handler http.Handler = mux
 	handler = logMiddleware(handler)
 
-	port, ok := os.LookupEnv("PORT")
-	if !ok {
-		port = "2704"
+	port := os.Getenv("PORT")
+	if port == "" {
+		return fmt.Errorf("PORT not set")
 	}
 
 	server := &http.Server{

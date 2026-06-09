@@ -1,4 +1,4 @@
-.PHONY: dev dash build install addword addwords
+.PHONY: dev dash build install test addword addwords
 
 DEV_PORT ?= 3000
 API_PORT ?= 2704
@@ -20,6 +20,9 @@ build:
 	cd client && VITE_WM_EPOCH="$(WM_EPOCH)" pnpm build
 	cd backend && go build -o ../bin/server .
 	cd backend && go build -o ../bin/dash ./cmd/dash
+
+test:
+	cd backend && go test ./...
 
 addword:
 	echo "$(w)" | tr '[:lower:]' '[:upper:]' | sort -mu - $(STATIC_DIR)/words.txt -o $(STATIC_DIR)/words.txt
