@@ -53,7 +53,7 @@ The gameplay is self-contained in `client`. Just build the static files.
 ```sh
 git clone https://github.com/zhengkyl/wordmongering
 cd client
-pnpm build
+VITE_WM_EPOCH=2026-06-01 pnpm build
 ```
 
 ### Backend for Score tracking + Feedback
@@ -82,8 +82,8 @@ make install
 make build
 
 # Start server
-STATIC_DIR=client/dist DB_PATH=data/app.db PORT=2704 ./bin/server
+STATIC_DIR=client/dist DB_PATH=data/app.db PORT=2704 WM_EPOCH=2026-06-01 ./bin/server
 
 # admin tui
-STATIC_DIR=client/dist DB_PATH=data/app.db ./bin/dash
+STATIC_DIR=client/dist DB_PATH=data/app.db WM_EPOCH=2026-06-01 ./bin/dash
 ```

@@ -4,7 +4,8 @@ RUN corepack enable pnpm && corepack prepare pnpm@9.15.0 --activate
 COPY client/package.json client/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY client .
-RUN pnpm build
+ARG VITE_WM_EPOCH
+RUN VITE_WM_EPOCH="$VITE_WM_EPOCH" pnpm build
 
 FROM golang:1.26-alpine AS go-builder
 WORKDIR /app
@@ -23,6 +24,8 @@ COPY --from=go-builder /bin/dash /bin/dash
 COPY --from=client-builder /app/dist /app/dist
 ENV STATIC_DIR=/app/dist
 ENV DB_PATH=/app/data/app.db
+ARG WM_EPOCH=2026-06-01
+ENV WM_EPOCH=$WM_EPOCH
 ARG PORT=2704
 ENV PORT=$PORT
 EXPOSE $PORT

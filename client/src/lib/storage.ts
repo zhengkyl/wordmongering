@@ -1,9 +1,9 @@
 import { getDayNumber } from "./daily";
 
 const RESULTS_KEY = "wm_results";
-const RESULTS_VERSION = 2;
+const RESULTS_VERSION = 3;
 const STREAKS_KEY = "wm_streaks";
-const STREAKS_VERSION = 2;
+const STREAKS_VERSION = 3;
 
 type StreakRecord = Record<number, [number, number]>;
 type ResultsRecord = Record<number, GameResult>;

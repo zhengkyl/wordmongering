@@ -1,5 +1,5 @@
 import { flushSync } from "preact/compat";
-import { useState } from "preact/hooks";
+import { useMemo, useState } from "preact/hooks";
 import { useParams } from "wouter-preact";
 import { DayDisplay } from "../components/DayDisplay";
 import { Game } from "../components/Game";
@@ -7,6 +7,7 @@ import { PageLayout } from "../components/PageLayout";
 import { Results } from "../components/Results";
 import { useWords } from "../components/WordsContext";
 import { getDayNumber, LOCAL_WM_EPOCH, MS_PER_DAY } from "../lib/daily";
+import { generateDailyPuzzle } from "../lib/generatePuzzle";
 import { getPlayerHint } from "../lib/playerHint";
 import { getDayResults, updateDayResults, updateStreak, type GameResult } from "../lib/storage";
 
@@ -27,17 +28,16 @@ type Streaks = { daysPlayed: number; currentStreak: number; bestStreak: number }
 type SessionResult = { gameResult: GameResult; streaks: Streaks | null };
 
 function GameLoader({ day }: { day: number }) {
-  const { words, puzzles } = useWords();
+  const { words, dead } = useWords();
 
   const existingResult = getDayResults(day);
   const [results, setResults] = useState<SessionResult | null>(
     existingResult ? { gameResult: existingResult, streaks: null } : null,
   );
 
-  const ready = words && puzzles;
-  const puzzle = ready && puzzles[day - 1];
+  const puzzle = useMemo(() => dead && generateDailyPuzzle(day, dead), [day, dead]);
 
-  if (puzzle == null) return <div class="mx-auto">Nothing here yet.</div>;
+  if (words == null || puzzle == null) return <div class="mx-auto">Loading...</div>;
 
   return (
     <>
@@ -48,9 +48,9 @@ function GameLoader({ day }: { day: number }) {
             ? "mx-auto w-fit text-center"
             : "mx-auto w-fit absolute left-0 right-0 text-center bottom-60vh overflow-hidden"
         }
-        animation={!results && ready ? "fade-out 0.8s ease-out 1s forwards" : undefined}
+        animation={!results ? "fade-out 0.8s ease-out 1s forwards" : undefined}
       />
-      {ready && results && (
+      {results && (
         <Results
           day={day}
           puzzle={puzzle}
@@ -65,7 +65,7 @@ function GameLoader({ day }: { day: number }) {
           }}
         />
       )}
-      {ready && !results && (
+      {!results && (
         <Game
           puzzle={puzzle}
           words={words}

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -12,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/zhengkyl/wordmongering/backend/cmd/dash/common"
 	"github.com/zhengkyl/wordmongering/backend/cmd/dash/util"
+	"github.com/zhengkyl/wordmongering/backend/internal/game"
 )
 
 type resultRow struct {
@@ -58,18 +58,9 @@ func loadMoreResults(db *sql.DB, dayFilter, offset int) tea.Cmd {
 	}
 }
 
-func loadPuzzleForResult(path string, row resultRow) tea.Cmd {
+func loadPuzzleForResult(row resultRow) tea.Cmd {
 	return func() tea.Msg {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return resultErrMsg{err}
-		}
-		lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
-		idx := row.puzzleId - 1
-		if idx < 0 || idx >= len(lines) {
-			return resultErrMsg{fmt.Errorf("day %d not found in puzzle file", row.puzzleId)}
-		}
-		return puzzleLoadedMsg{row: row, puzzle: lines[idx]}
+		return puzzleLoadedMsg{row: row, puzzle: game.GenerateDailyPuzzle(row.puzzleId)}
 	}
 }
 
@@ -138,9 +129,9 @@ func (m *listModel) Update(msg tea.Msg) (tea.Cmd, bool) {
 		case key.Matches(msg, km.Up):
 			m.pager.MoveUp()
 			return nil, true
-		case key.Matches(msg, km.Edit):
+		case msg.String() == "e" || msg.String() == "enter":
 			if len(m.items) > 0 {
-				return loadPuzzleForResult(m.props.Global.PuzzlePath, m.items[m.pager.Cursor]), true
+				return loadPuzzleForResult(m.items[m.pager.Cursor]), true
 			}
 			return nil, true
 		}

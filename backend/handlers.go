@@ -39,15 +39,20 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type api struct {
-	db          *sql.DB
-	pepper      string
-	dict        *bloom.BloomFilter
-	puzzlesPath string
-	puzzlesMu   sync.RWMutex
-	puzzles     []string
+	db      *sql.DB
+	pepper  string
+	dict    *bloom.BloomFilter
+	wordSet map[string]struct{}
+
+	puzzleMu    sync.RWMutex
+	puzzleCache map[int]string
 }
 
 func newApiHandler(db *sql.DB, staticDir string, pepper string) (*api, error) {
+	if err := game.LoadDead(staticDir); err != nil {
+		return nil, fmt.Errorf("load dead sets: %w", err)
+	}
+
 	f, err := os.Open(filepath.Join(staticDir, "words.txt"))
 	if err != nil {
 		return nil, fmt.Errorf("open words: %w", err)
@@ -55,10 +60,13 @@ func newApiHandler(db *sql.DB, staticDir string, pepper string) (*api, error) {
 	defer f.Close()
 
 	filter := bloom.NewWithEstimates(300000, 0.01)
+	wordSet := make(map[string]struct{})
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		if word := scanner.Text(); word != "" {
+		word := scanner.Text()
+		if word != "" {
 			filter.Add([]byte(word + pepper))
+			wordSet[word] = struct{}{}
 		}
 	}
 
@@ -66,45 +74,37 @@ func newApiHandler(db *sql.DB, staticDir string, pepper string) (*api, error) {
 		db:          db,
 		pepper:      pepper,
 		dict:        filter,
-		puzzlesPath: filepath.Join(staticDir, "puzzles.txt"),
+		wordSet:     wordSet,
+		puzzleCache: make(map[int]string),
 	}, nil
 }
 
-func (a *api) getPuzzle(day int) (string, bool) {
-	a.puzzlesMu.RLock()
-	if day <= len(a.puzzles) {
-		p := a.puzzles[day-1]
-		a.puzzlesMu.RUnlock()
-		return p, true
+func (a *api) getPuzzle(day int) string {
+	a.puzzleMu.RLock()
+	if p, ok := a.puzzleCache[day]; ok {
+		a.puzzleMu.RUnlock()
+		return p
 	}
-	a.puzzlesMu.RUnlock()
+	a.puzzleMu.RUnlock()
 
-	a.puzzlesMu.Lock()
-	defer a.puzzlesMu.Unlock()
-	if day <= len(a.puzzles) {
-		return a.puzzles[day-1], true
-	}
-	f, err := os.Open(a.puzzlesPath)
-	if err != nil {
-		return "", false
-	}
-	defer f.Close()
-	var puzzles []string
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		if line := s.Text(); line != "" {
-			puzzles = append(puzzles, line)
-		}
-	}
-	a.puzzles = puzzles
-	if day > len(a.puzzles) {
-		return "", false
-	}
-	return a.puzzles[day-1], true
+	p := game.GenerateDailyPuzzle(day)
+
+	a.puzzleMu.Lock()
+	a.puzzleCache[day] = p
+	a.puzzleMu.Unlock()
+	return p
 }
 
-// Earliest Midnight April 27, 2026 UTC+14
-var epoch = time.Date(2026, time.April, 26, 10, 0, 0, 0, time.UTC)
+var epoch = parseEpoch()
+
+func parseEpoch() time.Time {
+	t, err := time.Parse("2006-01-02", os.Getenv("WM_EPOCH"))
+	if err != nil {
+		panic(err)
+	}
+	// Earliest midnight on the epoch date is UTC+14, i.e. 14h before UTC midnight.
+	return t.Add(-14 * time.Hour)
+}
 
 func maxDay() int {
 	return int(math.Ceil(time.Since(epoch).Hours() / 24.0))
@@ -183,11 +183,7 @@ func (a *api) handlePostSolves(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	puzzle, ok := a.getPuzzle(day)
-	if !ok {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
+	puzzle := a.getPuzzle(day)
 
 	seen := make(map[string]struct{}, len(body.Words))
 	for _, word := range body.Words {

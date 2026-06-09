@@ -1,17 +1,18 @@
 import type { ComponentChildren } from "preact";
 import { createContext } from "preact";
 import { useContext, useEffect, useState } from "preact/hooks";
+import { parseDeadSet, type DeadSets } from "../lib/generatePuzzle";
 
 const WordsContext = createContext<{
   words: Set<string> | null;
   superWords: string[] | null;
-  puzzles: string[] | null;
-}>({ words: null, puzzles: null, superWords: null });
+  dead: DeadSets | null;
+}>({ words: null, superWords: null, dead: null });
 
 export function WordsProvider({ children }: { children: ComponentChildren }) {
   const [words, setWords] = useState<Set<string> | null>(null);
   const [superWords, setSuperWords] = useState<string[] | null>(null);
-  const [puzzles, setPuzzles] = useState<string[] | null>(null);
+  const [dead, setDead] = useState<DeadSets | null>(null);
 
   useEffect(() => {
     fetch("/words.txt")
@@ -21,21 +22,20 @@ export function WordsProvider({ children }: { children: ComponentChildren }) {
         console.log(`${set.size} words loaded`);
         setWords(set);
       });
-    fetch("/puzzles.txt")
-      .then((r) => r.text())
-      .then((text) => {
-        console.log(text.trim().split("\n"));
-        setPuzzles(text.trim().split("\n"));
-      });
     fetch("/super25k.txt")
       .then((r) => r.text())
       .then((text) => {
         setSuperWords(text.trim().split("\n"));
       });
+    Promise.all(
+      ["dead2", "dead3"].map((name) => fetch(`/${name}.txt`).then((r) => r.text())),
+    ).then(([two, three]) => {
+      setDead({ two: parseDeadSet(two), three: parseDeadSet(three) });
+    });
   }, []);
 
   return (
-    <WordsContext.Provider value={{ words, puzzles, superWords }}>{children}</WordsContext.Provider>
+    <WordsContext.Provider value={{ words, superWords, dead }}>{children}</WordsContext.Provider>
   );
 }
 
