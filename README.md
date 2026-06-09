@@ -36,16 +36,14 @@ Also trying to reduce bad entries. It's ~60% historical garbage, but filtering o
 
 Make sure to access development site via vite's port (probably localhost:5173). Api requests are proxied by vite to a different port.
 
-`WM_EPOCH` is the date of day 1 and must be set (there is no default).
-
 ```sh
 make install
 
 # vite dev server, proxied go backend, accessible on lan
-make dev WM_EPOCH=2026-04-27
+make dev
 
 # admin tui
-make dash WM_EPOCH=2026-04-27
+make dash
 ```
 
 ## Deploy
@@ -81,7 +79,7 @@ docker exec -it <container_id_or_name> dash
 git clone https://github.com/zhengkyl/wordmongering
 cd wordmongering
 make install
-make build WM_EPOCH=2026-04-27
+make build
 
 # Start server
 STATIC_DIR=client/dist DB_PATH=data/app.db PORT=2704 WM_EPOCH=2026-04-27 ./bin/server
