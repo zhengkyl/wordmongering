@@ -1,4 +1,4 @@
-export const LOCAL_WM_EPOCH = new Date(import.meta.env.VITE_WM_EPOCH).getTime();
+export const LOCAL_WM_EPOCH = new Date(import.meta.env.VITE_WM_EPOCH + "T00:00:00").getTime();
 export const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function getDayNumber(): number {
