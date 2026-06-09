@@ -16,10 +16,8 @@ import { generateDailyPuzzle, parseDeadSet } from "../src/lib/generatePuzzle.ts"
 const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
 const read = (name) => parseDeadSet(readFileSync(publicDir + name, "utf8"));
 const dead = {
-  no2: read("no2.txt"),
-  one2: read("one2.txt"),
-  no3: read("no3.txt"),
-  one3: read("one3.txt"),
+  two: read("dead2.txt"),
+  three: read("dead3.txt"),
 };
 
 const dayCount = Number(process.argv[2]);

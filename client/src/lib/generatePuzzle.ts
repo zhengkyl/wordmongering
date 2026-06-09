@@ -9,13 +9,11 @@ const LETTER_POOL = Object.entries({
 
 const PUZZLE_LENGTH = 30;
 
-// Dead 2- and 3-letter sequences (keyed by sorted letters), loaded from the
-// no2/one2/no3/one3 .txt files in public/. See backend/internal/game/dead.go.
+// Dead 2- and 3-letter sequences (keyed by sorted letters), loaded from
+// dead2.txt and dead3.txt in public/. See backend/internal/game/dead.go.
 export type DeadSets = {
-  no2: Set<string>;
-  one2: Set<string>;
-  no3: Set<string>;
-  one3: Set<string>;
+  two: Set<string>;
+  three: Set<string>;
 };
 
 export function parseDeadSet(data: string): Set<string> {
@@ -62,12 +60,10 @@ export function generateDailyPuzzle(day: number, dead: DeadSets): string {
 function validNext(puzzle: string, c: string, dead: DeadSets): boolean {
   const n = puzzle.length;
   if (n >= 1) {
-    const k = sortedKey(puzzle[n - 1] + c);
-    if (dead.no2.has(k) || dead.one2.has(k)) return false;
+    if (dead.two.has(sortedKey(puzzle[n - 1] + c))) return false;
   }
   if (n >= 2) {
-    const k = sortedKey(puzzle[n - 2] + puzzle[n - 1] + c);
-    if (dead.no3.has(k) || dead.one3.has(k)) return false;
+    if (dead.three.has(sortedKey(puzzle[n - 2] + puzzle[n - 1] + c))) return false;
   }
   return true;
 }

@@ -57,20 +57,12 @@ func GenerateDailyPuzzle(day int) string {
 func validNext(puzzle []rune, c rune) bool {
 	n := len(puzzle)
 	if n >= 1 {
-		k := sortedKey([]rune{puzzle[n-1], c})
-		if _, ok := dead.no2[k]; ok {
-			return false
-		}
-		if _, ok := dead.one2[k]; ok {
+		if _, ok := dead.two[sortedKey([]rune{puzzle[n-1], c})]; ok {
 			return false
 		}
 	}
 	if n >= 2 {
-		k := sortedKey([]rune{puzzle[n-2], puzzle[n-1], c})
-		if _, ok := dead.no3[k]; ok {
-			return false
-		}
-		if _, ok := dead.one3[k]; ok {
+		if _, ok := dead.three[sortedKey([]rune{puzzle[n-2], puzzle[n-1], c})]; ok {
 			return false
 		}
 	}

@@ -28,16 +28,9 @@ export function WordsProvider({ children }: { children: ComponentChildren }) {
         setSuperWords(text.trim().split("\n"));
       });
     Promise.all(
-      ["no2", "one2", "no3", "one3"].map((name) =>
-        fetch(`/${name}.txt`).then((r) => r.text()),
-      ),
-    ).then(([no2, one2, no3, one3]) => {
-      setDead({
-        no2: parseDeadSet(no2),
-        one2: parseDeadSet(one2),
-        no3: parseDeadSet(no3),
-        one3: parseDeadSet(one3),
-      });
+      ["dead2", "dead3"].map((name) => fetch(`/${name}.txt`).then((r) => r.text())),
+    ).then(([two, three]) => {
+      setDead({ two: parseDeadSet(two), three: parseDeadSet(three) });
     });
   }, []);
 

@@ -118,12 +118,9 @@ func renderPuzzleItem(p puzzleItem, selected bool) string {
 	marks := game.Annotate(p.puzzle)
 	var coloredPuzzle strings.Builder
 	for i, ch := range p.puzzle {
-		switch marks[i] {
-		case 'D':
+		if marks[i] == 'D' {
 			coloredPuzzle.WriteString(common.ErrStyle.Render(string(ch)))
-		case '1':
-			coloredPuzzle.WriteString(common.WarnStyle.Render(string(ch)))
-		default:
+		} else {
 			coloredPuzzle.WriteString(string(ch))
 		}
 	}
