@@ -24,6 +24,8 @@ COPY --from=go-builder /bin/dash /bin/dash
 COPY --from=client-builder /app/dist /app/dist
 ENV STATIC_DIR=/app/dist
 ENV DB_PATH=/app/data/app.db
+ARG WM_EPOCH=2026-04-27
+ENV WM_EPOCH=$WM_EPOCH
 ARG PORT=2704
 ENV PORT=$PORT
 EXPOSE $PORT
