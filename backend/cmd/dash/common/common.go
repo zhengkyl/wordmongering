@@ -39,10 +39,9 @@ func DayLabel(day int) string {
 }
 
 type Global struct {
-	DB      *sql.DB
-	KeyMap  keymap.KeyMap
-	Words   []string
-	WordSet map[string]struct{}
+	DB     *sql.DB
+	KeyMap keymap.KeyMap
+	Words  []string
 }
 
 

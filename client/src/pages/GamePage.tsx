@@ -35,9 +35,9 @@ function GameLoader({ day }: { day: number }) {
     existingResult ? { gameResult: existingResult, streaks: null } : null,
   );
 
-  const puzzle = useMemo(() => words && generateDailyPuzzle(day, words), [day, words]);
+  const puzzle = useMemo(() => generateDailyPuzzle(day), [day]);
 
-  if (puzzle == null) return <div class="mx-auto">Nothing here yet.</div>;
+  if (words == null) return <div class="mx-auto">Loading...</div>;
 
   return (
     <>
@@ -68,7 +68,7 @@ function GameLoader({ day }: { day: number }) {
       {!results && (
         <Game
           puzzle={puzzle}
-          words={words!}
+          words={words}
           onComplete={(words) => {
             fetch(`/api/solves/${day}`, {
               method: "POST",

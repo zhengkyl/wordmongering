@@ -115,7 +115,7 @@ func (p *weekPager) PageInfo(total int) string {
 
 func renderPuzzleItem(p puzzleItem, selected bool) string {
 	dateStr := common.DayLabel(p.day)
-	marks := annotate(p.puzzle)
+	marks := game.Annotate(p.puzzle)
 	var coloredPuzzle strings.Builder
 	for i, ch := range p.puzzle {
 		switch marks[i] {
@@ -155,12 +155,11 @@ func (m *listModel) Init() tea.Cmd {
 }
 
 func (m *listModel) loadPuzzles() tea.Cmd {
-	wordSet := m.props.Global.WordSet
 	return func() tea.Msg {
 		maxDay := common.MaxDay()
 		items := make([]puzzleItem, maxDay)
 		for d := maxDay; d >= 1; d-- {
-			items[maxDay-d] = puzzleItem{day: d, puzzle: game.GenerateDailyPuzzle(d, wordSet)}
+			items[maxDay-d] = puzzleItem{day: d, puzzle: game.GenerateDailyPuzzle(d)}
 		}
 		return loadedMsg(items)
 	}

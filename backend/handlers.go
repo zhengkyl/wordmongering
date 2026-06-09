@@ -83,7 +83,7 @@ func (a *api) getPuzzle(day int) string {
 	}
 	a.puzzleMu.RUnlock()
 
-	p := game.GenerateDailyPuzzle(day, a.wordSet)
+	p := game.GenerateDailyPuzzle(day)
 
 	a.puzzleMu.Lock()
 	a.puzzleCache[day] = p

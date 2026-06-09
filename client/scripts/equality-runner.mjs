@@ -3,26 +3,27 @@
 // Go generator. Imports the real client generator so there is no second copy
 // of the algorithm to drift.
 //
-// Usage: node equality-runner.mjs <words.txt path> <dayCount>
+// Usage: node equality-runner.mjs <dayCount>
 // Prints one puzzle per line for days 1..dayCount.
 //
 // Requires Node with TypeScript type stripping (Node >= 22.6 with
 // --experimental-strip-types, on by default since 23.6) to import the .ts file.
+// raw-loader.mjs is registered first so the generator's `?raw` text imports
+// resolve under Node.
 
-import { readFileSync } from "node:fs";
-import { generateDailyPuzzle } from "../src/lib/generatePuzzle.ts";
+import { register } from "node:module";
 
-const [, , wordsPath, dayCountArg] = process.argv;
-if (!wordsPath || !dayCountArg) {
-  throw new Error("usage: equality-runner.mjs <words.txt path> <dayCount>");
+register("./raw-loader.mjs", import.meta.url);
+
+const { generateDailyPuzzle } = await import("../src/lib/generatePuzzle.ts");
+
+const dayCount = Number(process.argv[2]);
+if (!Number.isInteger(dayCount) || dayCount < 1) {
+  throw new Error("usage: equality-runner.mjs <dayCount>");
 }
-
-const dayCount = Number(dayCountArg);
-// Mirror WordsContext.tsx: the puzzle word set is words.txt split on newlines.
-const words = new Set(readFileSync(wordsPath, "utf8").trim().split("\n"));
 
 const lines = [];
 for (let day = 1; day <= dayCount; day++) {
-  lines.push(generateDailyPuzzle(day, words));
+  lines.push(generateDailyPuzzle(day));
 }
 process.stdout.write(lines.join("\n"));

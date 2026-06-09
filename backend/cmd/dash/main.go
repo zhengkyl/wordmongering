@@ -29,18 +29,6 @@ func loadWordList(path string) ([]string, error) {
 	return words, nil
 }
 
-func loadWordSet(path string) (map[string]struct{}, error) {
-	words, err := loadWordList(path)
-	if err != nil {
-		return nil, err
-	}
-	set := make(map[string]struct{}, len(words))
-	for _, w := range words {
-		set[w] = struct{}{}
-	}
-	return set, nil
-}
-
 func main() {
 	staticDir := os.Getenv("STATIC_DIR")
 	dbPath := os.Getenv("DB_PATH")
@@ -52,12 +40,6 @@ func main() {
 	}
 	puzzles.InitWords(superWords)
 
-	wordSet, err := loadWordSet(filepath.Join(staticDir, "words.txt"))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "load words: %v\n", err)
-		os.Exit(1)
-	}
-
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "open db: %v\n", err)
@@ -67,10 +49,9 @@ func main() {
 
 	props := common.Props{
 		Global: common.Global{
-			DB:      db,
-			KeyMap:  keymap.Default(),
-			Words:   superWords,
-			WordSet: wordSet,
+			DB:     db,
+			KeyMap: keymap.Default(),
+			Words:  superWords,
 		},
 	}
 

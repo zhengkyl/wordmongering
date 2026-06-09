@@ -58,9 +58,9 @@ func loadMoreResults(db *sql.DB, dayFilter, offset int) tea.Cmd {
 	}
 }
 
-func loadPuzzleForResult(wordSet map[string]struct{}, row resultRow) tea.Cmd {
+func loadPuzzleForResult(row resultRow) tea.Cmd {
 	return func() tea.Msg {
-		return puzzleLoadedMsg{row: row, puzzle: game.GenerateDailyPuzzle(row.puzzleId, wordSet)}
+		return puzzleLoadedMsg{row: row, puzzle: game.GenerateDailyPuzzle(row.puzzleId)}
 	}
 }
 
@@ -131,7 +131,7 @@ func (m *listModel) Update(msg tea.Msg) (tea.Cmd, bool) {
 			return nil, true
 		case msg.String() == "e" || msg.String() == "enter":
 			if len(m.items) > 0 {
-				return loadPuzzleForResult(m.props.Global.WordSet, m.items[m.pager.Cursor]), true
+				return loadPuzzleForResult(m.items[m.pager.Cursor]), true
 			}
 			return nil, true
 		}
