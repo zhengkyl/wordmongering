@@ -47,13 +47,7 @@ func run(ctx context.Context) error {
 	defer cancel()
 
 	staticDir := os.Getenv("STATIC_DIR")
-	if staticDir == "" {
-		return fmt.Errorf("STATIC_DIR not set")
-	}
 	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		return fmt.Errorf("DB_PATH not set")
-	}
 
 	db, err := setupDB(dbPath)
 	if err != nil {
@@ -82,9 +76,6 @@ func run(ctx context.Context) error {
 	handler = logMiddleware(handler)
 
 	port := os.Getenv("PORT")
-	if port == "" {
-		return fmt.Errorf("PORT not set")
-	}
 
 	server := &http.Server{
 		Addr:         ":" + port,

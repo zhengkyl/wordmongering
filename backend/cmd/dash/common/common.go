@@ -18,13 +18,9 @@ const (
 var Epoch = parseEpoch()
 
 func parseEpoch() time.Time {
-	s := os.Getenv("WM_EPOCH")
-	if s == "" {
-		panic("WM_EPOCH not set")
-	}
-	t, err := time.Parse("2006-01-02", s)
+	t, err := time.Parse("2006-01-02", os.Getenv("WM_EPOCH"))
 	if err != nil {
-		panic("invalid WM_EPOCH: " + err.Error())
+		panic(err)
 	}
 	return t.AddDate(0, 0, -1)
 }

@@ -4,7 +4,6 @@ DEV_PORT ?= 3000
 API_PORT ?= 2704
 STATIC_DIR ?= $(CURDIR)/client/public
 DB_PATH ?= $(CURDIR)/data/app.db
-WM_EPOCH ?= 2026-04-27
 
 install:
 	cd client && pnpm install

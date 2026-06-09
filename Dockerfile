@@ -4,7 +4,7 @@ RUN corepack enable pnpm && corepack prepare pnpm@9.15.0 --activate
 COPY client/package.json client/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY client .
-ARG VITE_WM_EPOCH=""
+ARG VITE_WM_EPOCH
 RUN VITE_WM_EPOCH="$VITE_WM_EPOCH" pnpm build
 
 FROM golang:1.26-alpine AS go-builder

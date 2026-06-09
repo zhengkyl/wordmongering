@@ -43,15 +43,7 @@ func loadWordSet(path string) (map[string]struct{}, error) {
 
 func main() {
 	staticDir := os.Getenv("STATIC_DIR")
-	if staticDir == "" {
-		fmt.Fprint(os.Stderr, "STATIC_DIR not set")
-		os.Exit(1)
-	}
 	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		fmt.Fprint(os.Stderr, "DB_PATH not set")
-		os.Exit(1)
-	}
 
 	superWords, err := loadWordList(filepath.Join(staticDir, "super25k.txt"))
 	if err != nil {

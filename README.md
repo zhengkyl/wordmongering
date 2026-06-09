@@ -36,14 +36,16 @@ Also trying to reduce bad entries. It's ~60% historical garbage, but filtering o
 
 Make sure to access development site via vite's port (probably localhost:5173). Api requests are proxied by vite to a different port.
 
+`WM_EPOCH` is the date of day 1 and must be set (there is no default).
+
 ```sh
 make install
 
 # vite dev server, proxied go backend, accessible on lan
-make dev
+make dev WM_EPOCH=2026-04-27
 
 # admin tui
-make dash
+make dash WM_EPOCH=2026-04-27
 ```
 
 ## Deploy
@@ -53,7 +55,7 @@ The gameplay is self-contained in `client`. Just build the static files.
 ```sh
 git clone https://github.com/zhengkyl/wordmongering
 cd client
-pnpm build
+VITE_WM_EPOCH=2026-04-27 pnpm build
 ```
 
 ### Backend for Score tracking + Feedback
@@ -79,11 +81,11 @@ docker exec -it <container_id_or_name> dash
 git clone https://github.com/zhengkyl/wordmongering
 cd wordmongering
 make install
-make build
+make build WM_EPOCH=2026-04-27
 
 # Start server
-STATIC_DIR=client/dist DB_PATH=data/app.db PORT=2704 ./bin/server
+STATIC_DIR=client/dist DB_PATH=data/app.db PORT=2704 WM_EPOCH=2026-04-27 ./bin/server
 
 # admin tui
-STATIC_DIR=client/dist DB_PATH=data/app.db ./bin/dash
+STATIC_DIR=client/dist DB_PATH=data/app.db WM_EPOCH=2026-04-27 ./bin/dash
 ```

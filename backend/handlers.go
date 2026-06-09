@@ -94,13 +94,9 @@ func (a *api) getPuzzle(day int) string {
 var epoch = parseEpoch()
 
 func parseEpoch() time.Time {
-	s := os.Getenv("WM_EPOCH")
-	if s == "" {
-		panic("WM_EPOCH not set")
-	}
-	t, err := time.Parse("2006-01-02", s)
+	t, err := time.Parse("2006-01-02", os.Getenv("WM_EPOCH"))
 	if err != nil {
-		panic("invalid WM_EPOCH: " + err.Error())
+		panic(err)
 	}
 	// Earliest midnight on the epoch date is UTC+14, i.e. 14h before UTC midnight.
 	return t.Add(-14 * time.Hour)
