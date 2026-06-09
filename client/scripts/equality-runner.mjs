@@ -8,14 +8,19 @@
 //
 // Requires Node with TypeScript type stripping (Node >= 22.6 with
 // --experimental-strip-types, on by default since 23.6) to import the .ts file.
-// raw-loader.mjs is registered first so the generator's `?raw` text imports
-// resolve under Node.
 
-import { register } from "node:module";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { generateDailyPuzzle, parseDeadSet } from "../src/lib/generatePuzzle.ts";
 
-register("./raw-loader.mjs", import.meta.url);
-
-const { generateDailyPuzzle } = await import("../src/lib/generatePuzzle.ts");
+const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
+const read = (name) => parseDeadSet(readFileSync(publicDir + name, "utf8"));
+const dead = {
+  no2: read("no2.txt"),
+  one2: read("one2.txt"),
+  no3: read("no3.txt"),
+  one3: read("one3.txt"),
+};
 
 const dayCount = Number(process.argv[2]);
 if (!Number.isInteger(dayCount) || dayCount < 1) {
@@ -24,6 +29,6 @@ if (!Number.isInteger(dayCount) || dayCount < 1) {
 
 const lines = [];
 for (let day = 1; day <= dayCount; day++) {
-  lines.push(generateDailyPuzzle(day));
+  lines.push(generateDailyPuzzle(day, dead));
 }
 process.stdout.write(lines.join("\n"));

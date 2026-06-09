@@ -49,6 +49,10 @@ type api struct {
 }
 
 func newApiHandler(db *sql.DB, staticDir string, pepper string) (*api, error) {
+	if err := game.LoadDead(staticDir); err != nil {
+		return nil, fmt.Errorf("load dead sets: %w", err)
+	}
+
 	f, err := os.Open(filepath.Join(staticDir, "words.txt"))
 	if err != nil {
 		return nil, fmt.Errorf("open words: %w", err)

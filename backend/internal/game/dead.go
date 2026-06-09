@@ -1,7 +1,8 @@
 package game
 
 import (
-	_ "embed"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -10,30 +11,37 @@ import (
 // matter. "no" combinations occur in zero words; "one" combinations are barely
 // usable. Puzzle generation avoids all of them.
 //
-// These files are the source of truth; client/src/lib/dead/*.txt are copies
-// kept identical by TestGenerateDailyPuzzleMatchesClient.
-
-//go:embed no2.txt
-var no2File string
-
-//go:embed one2.txt
-var one2File string
-
-//go:embed no3.txt
-var no3File string
-
-//go:embed one3.txt
-var one3File string
-
+// Loaded from the static dir (alongside words.txt) via LoadDead, which must be
+// called before GenerateDailyPuzzle or Annotate.
 var dead struct {
 	no2, one2, no3, one3 map[string]struct{}
 }
 
-func init() {
-	dead.no2 = loadSet(no2File)
-	dead.one2 = loadSet(one2File)
-	dead.no3 = loadSet(no3File)
-	dead.one3 = loadSet(one3File)
+// LoadDead reads the dead-sequence sets from dir (the static dir that also holds
+// words.txt).
+func LoadDead(dir string) error {
+	var err error
+	if dead.no2, err = loadSetFile(filepath.Join(dir, "no2.txt")); err != nil {
+		return err
+	}
+	if dead.one2, err = loadSetFile(filepath.Join(dir, "one2.txt")); err != nil {
+		return err
+	}
+	if dead.no3, err = loadSetFile(filepath.Join(dir, "no3.txt")); err != nil {
+		return err
+	}
+	if dead.one3, err = loadSetFile(filepath.Join(dir, "one3.txt")); err != nil {
+		return err
+	}
+	return nil
+}
+
+func loadSetFile(path string) (map[string]struct{}, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return loadSet(string(data)), nil
 }
 
 func loadSet(data string) map[string]struct{} {

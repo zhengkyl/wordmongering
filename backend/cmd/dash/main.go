@@ -12,6 +12,7 @@ import (
 	"github.com/zhengkyl/wordmongering/backend/cmd/dash/common"
 	"github.com/zhengkyl/wordmongering/backend/cmd/dash/keymap"
 	"github.com/zhengkyl/wordmongering/backend/cmd/dash/pages/puzzles"
+	"github.com/zhengkyl/wordmongering/backend/internal/game"
 )
 
 func loadWordList(path string) ([]string, error) {
@@ -39,6 +40,11 @@ func main() {
 		os.Exit(1)
 	}
 	puzzles.InitWords(superWords)
+
+	if err := game.LoadDead(staticDir); err != nil {
+		fmt.Fprintf(os.Stderr, "load dead sets: %v\n", err)
+		os.Exit(1)
+	}
 
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {

@@ -28,16 +28,16 @@ type Streaks = { daysPlayed: number; currentStreak: number; bestStreak: number }
 type SessionResult = { gameResult: GameResult; streaks: Streaks | null };
 
 function GameLoader({ day }: { day: number }) {
-  const { words } = useWords();
+  const { words, dead } = useWords();
 
   const existingResult = getDayResults(day);
   const [results, setResults] = useState<SessionResult | null>(
     existingResult ? { gameResult: existingResult, streaks: null } : null,
   );
 
-  const puzzle = useMemo(() => generateDailyPuzzle(day), [day]);
+  const puzzle = useMemo(() => dead && generateDailyPuzzle(day, dead), [day, dead]);
 
-  if (words == null) return <div class="mx-auto">Loading...</div>;
+  if (words == null || puzzle == null) return <div class="mx-auto">Loading...</div>;
 
   return (
     <>

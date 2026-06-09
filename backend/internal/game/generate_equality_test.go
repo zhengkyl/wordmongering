@@ -28,6 +28,10 @@ func TestGenerateDailyPuzzleMatchesClient(t *testing.T) {
 
 	root := repoRoot(t)
 
+	if err := LoadDead(filepath.Join(root, "client", "public")); err != nil {
+		t.Fatalf("load dead sets: %v", err)
+	}
+
 	goPuzzles := make([]string, dayCount)
 	for day := 1; day <= dayCount; day++ {
 		goPuzzles[day-1] = GenerateDailyPuzzle(day)
